@@ -20,20 +20,32 @@ read -p "🔗 Masukkan URL biner yang dikompilasi: " BIN_URL
 # Nama file biner
 BIN_NAME="pipe"
 
-# Meminta Solana Public Key
-read -p "🔑 Masukkan Solana Public Key: " SOLANA_KEY
+# Meminta Public Key dari pengguna
+read -p "🔑 Masukkan Public Key: " PUB_KEY
 
-# Periksa apakah URL kosong
-if [[ -z "$BIN_URL" ]]; then
-    echo -e "\n${RED}❌ URL tidak boleh kosong. Silakan coba lagi.${NC}\n"
+# Meminta ukuran RAM (dalam GB)
+read -p "💻 Masukkan ukuran RAM (dalam GB): " RAM_SIZE
+
+# Meminta ukuran disk maksimum (dalam GB)
+read -p "💾 Masukkan ukuran disk maksimum (dalam GB): " MAX_DISK
+
+# Memeriksa apakah URL atau Public Key kosong
+if [[ -z "$BIN_URL" || -z "$PUB_KEY" || -z "$RAM_SIZE" || -z "$MAX_DISK" ]]; then
+    echo -e "\n${RED}❌ Semua input harus diisi. Silakan coba lagi.${NC}\n"
     exit 1
 fi
 
-# Periksa apakah Solana Public Key kosong
-if [[ -z "$SOLANA_KEY" ]]; then
-    echo -e "\n${RED}❌ Solana Public Key tidak boleh kosong. Silakan coba lagi.${NC}\n"
-    exit 1
+# Menentukan direktori untuk Pipe Network
+PIPE_DIR="./pipe"
+
+# Membuat direktori pipe jika belum ada
+if [[ ! -d "$PIPE_DIR" ]]; then
+    echo -e "\n${YELLOW}📂 Membuat direktori 'pipe'...${NC}"
+    mkdir -p "$PIPE_DIR"
 fi
+
+# Masuk ke direktori pipe
+cd "$PIPE_DIR" || exit
 
 # Unduh biner
 echo -e "\n${YELLOW}📥 Mengunduh biner dari: ${BIN_URL} ...${NC}\n"
@@ -53,21 +65,18 @@ chmod +x $BIN_NAME
 echo -e "\n${YELLOW}📂 Membuat direktori 'download_cache'...${NC}"
 mkdir -p download_cache
 
-# Jalankan biner dengan parameter konfigurasi
-echo -e "\n${GREEN}🚀 Menjalankan Pipe Network Devnet v2 dengan konfigurasi...${NC}"
+# Jalankan biner dengan parameter tambahan
+echo -e "\n${GREEN}🚀 Menjalankan Pipe Network Devnet v2 dengan konfigurasi berikut:${NC}"
+echo -e "  RAM: ${RAM_SIZE} GB"
+echo -e "  Disk Maksimum: ${MAX_DISK} GB"
+echo -e "  Cache Directory: /data"
+echo -e "  Public Key: ${PUB_KEY}\n"
+
 ./$BIN_NAME \
-  --ram 8 \              # RAM in GB
-  --max-disk 500 \       # Max disk usage in GB  
-  --cache-dir /data \    # Cache location
-  --pubKey $SOLANA_KEY   # Solana public key
-
-# Menampilkan metrik
-echo -e "\n${CYAN}📊 Menampilkan metrik...${NC}"
-./pop --status
-
-# Memeriksa poin
-echo -e "\n${CYAN}🏆 Memeriksa poin...${NC}"
-./pop --points-route
+  --ram $RAM_SIZE \
+  --max-disk $MAX_DISK \
+  --cache-dir /data \
+  --pubKey $PUB_KEY
 
 # Sukses
 echo -e "\n${GREEN}✅ Instalasi selesai! Pipe Network Devnet v2 siap digunakan.${NC}\n"
