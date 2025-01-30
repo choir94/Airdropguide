@@ -4,60 +4,74 @@
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
 sleep 5
 
-# Warna
-NC='\033[0m'  # No Color
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-
-echo -e "\n${CYAN}${BOLD}Mempersiapkan sistem...${NC}\n"
-
-echo -e "${YELLOW}Menonaktifkan layanan DCDND...${NC}"
+echo "==============================================="
+echo "        🔹 Menghentikan Layanan DCDND 🔹       "
+echo "==============================================="
 systemctl stop dcdnd && systemctl disable dcdnd
+echo "✅ Layanan DCDND berhasil dihentikan."
+echo
 
-echo -e "\n${BLUE}Membuat folder di $HOME/pipe-devnet2...${NC}"
-mkdir -p $HOME/pipe-devnet2
+echo "==============================================="
+echo "     📁 Membuat Folder Konfigurasi Node 📁     "
+echo "==============================================="
+mkdir -p $HOME/pipenetwork-v2
+echo "✅ Folder '$HOME/pipenetwork-v2' telah dibuat."
+echo
 
-echo -e "${GREEN}Mengunduh file program pop...${NC}"
-wget -O $HOME/pipe-devnet2/pop https://dl.pipecdn.app/v0.2.0/pop
-chmod +x $HOME/pipe-devnet2/pop
+echo "==============================================="
+echo "  🔗 Masukkan Link Unduhan Binary v2 (HTTPS)  "
+echo "==============================================="
+read -r binary_url
 
-echo -e "\n${CYAN}Berapa jumlah RAM yang ingin dibagikan? (minimal 4GB): ${NC}"
-read -p "RAM: " RAM
+if [[ $binary_url == https* ]]; then
+    echo
+    echo "📥 Mengunduh file binary..."
+    wget -O $HOME/pipenetwork-v2/pop "$binary_url"
+    chmod +x $HOME/pipenetwork-v2/pop
+    echo "✅ Binary berhasil diunduh dan diberikan izin eksekusi."
+else
+    echo "❌ URL tidak valid. Pastikan link dimulai dengan 'https'."
+    exit 1
+fi
+echo
+
+echo "==============================================="
+echo "       💾 Konfigurasi Sumber Daya Node        "
+echo "==============================================="
+read -p "🔹 Masukkan jumlah RAM yang akan dibagikan (Minimal 4GB): " RAM
 if [ "$RAM" -lt 4 ]; then
-  echo -e "${RED}RAM harus minimal 4GB. Proses dibatalkan.${NC}"
+  echo "❌ RAM harus minimal 4GB. Keluar..."
   exit 1
 fi
 
-echo -e "\n${CYAN}Berapa besar ruang disk yang ingin digunakan? (minimal 100GB): ${NC}"
-read -p "Disk: " DISK
+read -p "🔹 Masukkan kapasitas maksimal penyimpanan (Minimal 100GB): " DISK
 if [ "$DISK" -lt 100 ]; then
-  echo -e "${RED}Ruang disk harus minimal 100GB. Proses dibatalkan.${NC}"
+  echo "❌ Penyimpanan harus minimal 100GB. Keluar..."
   exit 1
 fi
 
-echo -e "\n${CYAN}Masukkan kunci publik Anda: ${NC}"
-read -p "Kunci Publik: " PUBKEY
+read -p "🔹 Masukkan Public Key Anda: " PUBKEY
+echo
 
-SERVICE_FILE="/etc/systemd/system/pipe-devnet2.service"
-echo -e "\n${BLUE}Membuat file layanan di $SERVICE_FILE...${NC}"
+echo "==============================================="
+echo "      ⚙️  Membuat Layanan Systemd Node       "
+echo "==============================================="
+SERVICE_FILE="/etc/systemd/system/pipe.service"
 
 cat <<EOF | sudo tee $SERVICE_FILE > /dev/null
 [Unit]
-Description=Layanan Pipe POP untuk Devnet2
+Description=Pipe POP Node Service
 After=network.target
 Wants=network-online.target
 
 [Service]
 User=$USER
-ExecStart=$HOME/pipe-devnet2/pop \
+ExecStart=$HOME/pipenetwork-v2/pop \
     --ram=$RAM \
     --pubKey $PUBKEY \
     --max-disk $DISK \
-    --cache-dir $HOME/pipe-devnet2/download_cache
+    --cache-dir $HOME/pipenetwork-v2/download_cache \
+    --signup-by-referral-route bbd621b967133f40
 Restart=always
 RestartSec=5
 LimitNOFILE=65536
@@ -65,16 +79,25 @@ LimitNPROC=4096
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=dcdn-node
-WorkingDirectory=$HOME/pipe-devnet2
+WorkingDirectory=$HOME/pipenetwork-v2
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo -e "\n${GREEN}Memuat ulang konfigurasi systemd dan memulai layanan Pipe...${NC}"
-sudo systemctl daemon-reload && \
-sudo systemctl enable pipe-devnet2 && \
-sudo systemctl restart pipe-devnet2 && \
-journalctl -u pipe-devnet2 -fo cat
+echo "✅ Layanan systemd berhasil dibuat: $SERVICE_FILE"
+echo
 
-echo -e "\n${CYAN}${BOLD}Proses selesai! Layanan Pipe Devnet2 sekarang aktif.${NC}"
+echo "==============================================="
+echo "  🔄 Memulai dan Mengaktifkan Layanan Node    "
+echo "==============================================="
+sudo systemctl daemon-reload
+sudo systemctl enable pipe
+sudo systemctl restart pipe
+echo "✅ Layanan pipe telah dimulai."
+echo
+
+echo "==============================================="
+echo "     📜 Menampilkan Log Layanan Secara Live   "
+echo "==============================================="
+journalctl -u pipe -fo cat
