@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Skrip instalasi logo
+curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
+sleep 5
+
 # Set the working directory and cache directory
 mkdir -p /root/pipenetwork
 mkdir -p /root/pipenetwork/download_cache
