@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =====================================================
-# 🚀 Script Instalasi Huddle01 Media Node 
+# 🚀 Script Otomatis Instalasi Media Node Huddle01
 # ✨ Dibuat oleh: Airdrop Node
 # 📢 Telegram: https://t.me/airdrop_node
 # =====================================================
@@ -45,6 +45,10 @@ echo -e "${HIJAU}✅ Menginstal Media Node CLI...${NC}"
 sudo apt install curl screen -y
 curl -fsSL https://huddle01.network/api/install.sh | bash
 sleep 1
+
+# Menambahkan path ke .bashrc
+echo 'export PATH=$PATH:/root/.hudl' >> ~/.bashrc
+source ~/.bashrc
 
 # Memuat ulang .bashrc agar perubahan path diterapkan
 echo -e "${HIJAU}🔄 Memuat ulang konfigurasi shell...${NC}"
