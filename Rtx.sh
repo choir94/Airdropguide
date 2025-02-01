@@ -122,16 +122,27 @@ info_message "Masukkan password untuk keystore (untuk mengakses node):"
 read -s KeystorePassword
 echo ""
 
-# 🔹 **Langkah 10: Jalankan Node dengan Firejail (GPU Mode)**
-info_message "Menjalankan Privasea Acceleration Node dengan Firejail dan GPU..."
-if firejail --profile=gpu.profile --noprofile docker run -d -v "$HOME/privasea/config:/app/config" \
+# 🔹 **Langkah 10: Setup Supervisord untuk Menjalankan Node**
+info_message "Mengatur supervisord untuk menjalankan node..."
+# Membuat file konfigurasi supervisord untuk node
+cat <<EOF | sudo tee /etc/supervisor/conf.d/privasea_node.conf
+[program:privasea_node]
+command=docker run -d -v $HOME/privasea/config:/app/config \
 -e KEYSTORE_PASSWORD=$KeystorePassword --device=/dev/nvidia0 --device=/dev/nvidiactl \
-privasea/acceleration-node-beta:latest; then
-    success_message "Node berhasil dijalankan dengan dukungan GPU!"
-else
-    error_message "Gagal menjalankan node dengan Firejail."
-    exit 1
-fi
+privasea/acceleration-node-beta:latest
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/privasea_node.err.log
+stdout_logfile=/var/log/privasea_node.out.log
+EOF
+
+# Memulai supervisord dan node
+sudo systemctl restart supervisor
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start privasea_node
+
+success_message "Node berhasil dijalankan dengan supervisord!"
 
 echo ""
 
