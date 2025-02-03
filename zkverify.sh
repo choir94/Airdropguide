@@ -22,7 +22,6 @@ fi
 # Menambahkan user ke grup Docker
 echo_msg "Menambahkan user ke grup Docker..."
 sudo usermod -aG docker $USER
-newgrp docker
 
 # Meminta input untuk nama node dan password user
 read -p "Masukkan nama node Anda: " NODE_NAME
