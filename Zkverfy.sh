@@ -1,6 +1,10 @@
 #!/bin/bash
 
-set -e  # Hentikan skrip jika terjadi error
+# Skrip instalasi logo
+curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
+sleep 5
+
+set -e  # Hentikan skrip jika ada error
 
 # ============================================================
 # 🎨 Fungsi untuk Menampilkan Pesan Berwarna
@@ -27,10 +31,40 @@ echo_error() {
 }
 
 # ============================================================
-# 1️⃣ Update Sistem & Install Dependensi
+# 1️⃣ Cek dan Install Docker & Docker Compose
 # ============================================================
-echo_info "🔄 ${BOLD}Mengupdate sistem & menginstal dependensi...${RESET}"
-sudo apt update && sudo apt install -y docker.io docker-compose jq sed git
+echo_info "🔄 ${BOLD}Memeriksa instalasi Docker dan Docker Compose...${RESET}"
+
+# Cek apakah Docker sudah terinstal
+if ! command -v docker &> /dev/null; then
+    echo_warn "🔴 Docker tidak terinstal. Menginstal Docker..."
+    
+    # Install dependencies untuk Docker
+    echo_info "⚙️ Menginstal dependensi untuk Docker..."
+    sudo apt update
+    sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+
+    # Menambahkan Docker repository dan menginstal Docker
+    echo_info "📥 Mengunduh dan menginstal Docker menggunakan get.docker.com..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+else
+    echo_info "✅ Docker sudah terinstal."
+fi
+
+# Cek apakah Docker Compose sudah terinstal
+if ! command -v docker-compose &> /dev/null; then
+    echo_warn "🔴 Docker Compose tidak terinstal. Menginstal Docker Compose versi terbaru..."
+
+    # Menginstal Docker Compose versi terbaru menggunakan curl
+    sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    
+    # Memberikan hak akses eksekusi pada file binary docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+
+else
+    echo_info "✅ Docker Compose sudah terinstal."
+fi
 
 # ============================================================
 # 2️⃣ Tambahkan User ke Grup Docker
