@@ -19,12 +19,6 @@ else
     echo_msg "Docker sudah terinstal, melewati instalasi Docker."
 fi
 
-# Memeriksa apakah Docker sudah berjalan
-if ! sudo systemctl is-active --quiet docker; then
-    echo_msg "Memulai Docker daemon..."
-    sudo systemctl start docker
-fi
-
 # Menambahkan user ke grup Docker
 echo_msg "Menambahkan user ke grup Docker..."
 sudo usermod -aG docker $USER
