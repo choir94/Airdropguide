@@ -1,145 +1,77 @@
 #!/bin/bash
+
 # Skrip instalasi logo
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
 sleep 5
 
-set -e  # Hentikan skrip jika ada error
+# Fungsi untuk menampilkan pesan
+function echo_msg() {
+    echo -e "\n>>> $1\n"
+}
 
-# ============================================================
-# Cek dan Install Docker & Docker Compose
-# ============================================================
-echo "Memeriksa instalasi Docker, Docker Compose, dan jq..."
+# Memperbarui dan menginstal dependensi
+echo_msg "Memperbarui sistem dan menginstal dependensi..."
+sudo apt update && sudo apt install -y docker.io docker-compose jq sed
 
-# Cek apakah Docker sudah terinstal
-if ! command -v docker &> /dev/null; then
-    echo "Docker tidak terinstal. Menginstal Docker..."
-    
-    # Install dependencies untuk Docker
-    echo "Menginstal dependensi untuk Docker..."
-    sudo apt update
-    sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+# Memulai Docker daemon
+echo_msg "Memulai Docker daemon..."
+sudo systemctl start docker
+sudo systemctl enable docker
 
-    # Menambahkan Docker repository dan menginstal Docker
-    echo "Mengunduh dan menginstal Docker menggunakan get.docker.com..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-else
-    echo "Docker sudah terinstal."
-fi
+# Verifikasi Docker
+docker --version
+sudo systemctl status docker
 
-# Install jq jika belum ada
-if ! command -v jq &> /dev/null; then
-    echo "jq tidak terinstal. Menginstal jq..."
-    sudo apt install jq -y
-else
-    echo "jq sudah terinstal."
-fi
-
-# Cek apakah Docker Compose sudah terinstal
-echo "Memeriksa versi Docker Compose..."
-
-if ! command -v docker-compose &> /dev/null || ! docker-compose --version &> /dev/null; then
-    echo "Docker Compose tidak terinstal atau versinya gagal. Menginstal ulang Docker Compose..."
-
-    # Menghapus Docker Compose yang ada jika ada masalah
-    sudo rm -f /usr/local/bin/docker-compose
-
-    # Menginstal Docker Compose versi terbaru menggunakan curl
-    echo "Menginstal Docker Compose versi terbaru..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    
-    # Memberikan hak akses eksekusi pada file binary docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-else
-    echo "Docker Compose sudah terinstal dan versi valid."
-fi
-
-# ============================================================
-# Tambahkan User ke Grup Docker
-# ============================================================
-echo "Menambahkan user ke grup Docker..."
+# Menambahkan user ke grup Docker
+echo_msg "Menambahkan user ke grup Docker..."
 sudo usermod -aG docker $USER
+newgrp docker
 
-# ============================================================
-# Input Nama User zkverify
-# ============================================================
-echo "Masukkan nama user untuk zkverify (default: zkverify): "
-read -p "Nama User: " zkverify_user
-zkverify_user=${zkverify_user:-zkverify}  # Default ke 'zkverify' jika tidak ada input
+# Meminta input untuk nama node dan password user
+read -p "Masukkan nama node Anda: " NODE_NAME
+read -sp "Masukkan password untuk user zkverify: " USER_PASS
+echo
 
-echo "Membuat user '$zkverify_user' jika belum ada..."
+# Membuat user zkverify dan menambahkannya ke grup Docker
+echo_msg "Membuat user zkverify dan menambahkannya ke grup Docker..."
+sudo useradd -m -s /bin/bash zkverify
+echo "zkverify:$USER_PASS" | sudo chpasswd
+sudo usermod -aG docker zkverify
 
-# Cek apakah user zkverify_user sudah ada
-if ! id "$zkverify_user" &>/dev/null; then
-    sudo useradd -m -s /bin/bash "$zkverify_user"
-    echo "$zkverify_user:$zkverify_user" | sudo chpasswd
-    sudo usermod -aG docker "$zkverify_user"
-    echo "User '$zkverify_user' berhasil dibuat!"
-else
-    echo "User '$zkverify_user' sudah ada, melewati pembuatan user."
-fi
-
-# ============================================================
-# Berpindah ke User zkverify_user dan Memulai Instalasi
-# ============================================================
-echo "Berpindah ke user '$zkverify_user' dan memulai instalasi..."
-sudo -i -u "$zkverify_user" bash << EOF
-set -e  # Hentikan jika ada error
+# Pindah ke user zkverify
+echo_msg "Pindah ke user zkverify..."
+su - zkverify <<EOF
 cd ~
 
-# ============================================================
-# Clone Repository jika Belum Ada
-# ============================================================
-if [ ! -d "compose-zkverify-simplified" ]; then
-    echo "Mengunduh repository ZKVerify..."
-    git clone https://github.com/zkVerify/compose-zkverify-simplified.git
-else
-    echo "Repository sudah ada, melewati cloning."
-fi
-
+# Clone repository ZKVerify
+echo_msg "Cloning repository ZKVerify..."
+git clone https://github.com/zkVerify/compose-zkverify-simplified.git
 cd compose-zkverify-simplified
 
-# ============================================================
-# Jalankan Skrip Init
-# ============================================================
-echo "Menjalankan skrip init..."
-echo -e "1\n2\ny\nn\nn" | ./scripts/init.sh
+# Menjalankan skrip init.sh
+echo_msg "Menjalankan skrip init.sh..."
+./scripts/init.sh <<ANSWER
+Validator Node
+Testnet
+Yes
+$NODE_NAME
+No
+No
+ANSWER
 
-# ============================================================
-# Berikan jeda sebelum melanjutkan ke langkah berikutnya
-# ============================================================
-echo "Tekan [Enter] untuk melanjutkan ke langkah berikutnya setelah menjalankan init.sh"
-read -r  # Tunggu hingga pengguna menekan Enter
+# Menjalankan node
+echo_msg "Menjalankan node..."
+./scripts/start.sh <<ANSWER
+Validator Node
+Testnet
+ANSWER
 
-# ============================================================
-# Jalankan Node
-# ============================================================
-echo "Menjalankan node ZKVerify..."
-echo -e "1\n2" | ./scripts/start.sh
+# Menjalankan docker-compose untuk mengaktifkan node
+docker compose -f /home/zkverify/compose-zkverify-simplified/deployments/validator-node/testnet/docker-compose.yml up -d
 
-# ============================================================
-# Berikan jeda setelah menjalankan start.sh
-# ============================================================
-echo "Tekan [Enter] untuk melanjutkan ke langkah berikutnya setelah menjalankan start.sh"
-read -r  # Tunggu hingga pengguna menekan Enter
-
-cd deployments/validator-node/testnet
-docker compose up -d
+# Cek log node
+echo_msg "Menunggu log node..."
+docker logs -f validator-node
 EOF
 
-# ============================================================
-# Verifikasi Apakah Container Berjalan
-# ============================================================
-echo "Memeriksa status container validator..."
-if docker ps --format "{{.Names}}" | grep -q "validator"; then
-    echo "Node ZKVerify berhasil dijalankan!"
-else
-    echo "Node ZKVerify gagal dijalankan. Cek log untuk detail."
-fi
-
-# ============================================================
-# Informasi Tambahan Setelah Instalasi
-# ============================================================
-echo "Gunakan perintah berikut untuk mengecek log:"
-echo "  docker logs -f \$(docker ps --format \"{{.Names}}\" | grep validator)"
-echo "Instalasi selesai!"
+echo_msg "Proses instalasi selesai. Node Anda sekarang sedang berjalan!"
