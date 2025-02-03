@@ -60,7 +60,6 @@ fi
 # ============================================================
 echo "Menambahkan user ke grup Docker..."
 sudo usermod -aG docker $USER
-newgrp docker  # Menerapkan perubahan grup tanpa perlu logout
 
 # ============================================================
 # Input Nama User zkverify
