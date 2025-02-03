@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Skrip instalasi logo
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
 sleep 5
@@ -107,10 +106,23 @@ echo "Menjalankan skrip init..."
 echo -e "1\n2\ny\nn\nn" | ./scripts/init.sh
 
 # ============================================================
+# Berikan jeda sebelum melanjutkan ke langkah berikutnya
+# ============================================================
+echo "Tekan [Enter] untuk melanjutkan ke langkah berikutnya setelah menjalankan init.sh"
+read -r  # Tunggu hingga pengguna menekan Enter
+
+# ============================================================
 # Jalankan Node
 # ============================================================
 echo "Menjalankan node ZKVerify..."
 echo -e "1\n2" | ./scripts/start.sh
+
+# ============================================================
+# Berikan jeda setelah menjalankan start.sh
+# ============================================================
+echo "Tekan [Enter] untuk melanjutkan ke langkah berikutnya setelah menjalankan start.sh"
+read -r  # Tunggu hingga pengguna menekan Enter
+
 cd deployments/validator-node/testnet
 docker compose up -d
 EOF
