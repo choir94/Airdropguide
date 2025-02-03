@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Skrip instalasi logo
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
 sleep 5
@@ -9,18 +8,22 @@ function echo_msg() {
     echo -e "\n>>> $1\n"
 }
 
-# Memperbarui dan menginstal dependensi
-echo_msg "Memperbarui sistem dan menginstal dependensi..."
-sudo apt update && sudo apt install -y docker.io docker-compose jq sed
+# Memeriksa apakah Docker sudah terinstal
+if ! command -v docker &> /dev/null; then
+    echo_msg "Docker tidak ditemukan, menginstal Docker..."
+    sudo apt update && sudo apt install -y docker.io docker-compose jq sed
+    # Memulai Docker daemon
+    sudo systemctl start docker
+    sudo systemctl enable docker
+else
+    echo_msg "Docker sudah terinstal, melewati instalasi Docker."
+fi
 
-# Memulai Docker daemon
-echo_msg "Memulai Docker daemon..."
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# Verifikasi Docker
-docker --version
-sudo systemctl status docker
+# Memeriksa apakah Docker sudah berjalan
+if ! sudo systemctl is-active --quiet docker; then
+    echo_msg "Memulai Docker daemon..."
+    sudo systemctl start docker
+fi
 
 # Menambahkan user ke grup Docker
 echo_msg "Menambahkan user ke grup Docker..."
