@@ -33,7 +33,7 @@ echo_error() {
 # ============================================================
 # 1️⃣ Cek dan Install Docker & Docker Compose
 # ============================================================
-echo_info "🔄 ${BOLD}Memeriksa instalasi Docker dan Docker Compose...${RESET}"
+echo_info "🔄 ${BOLD}Memeriksa instalasi Docker, Docker Compose, dan jq...${RESET}"
 
 # Cek apakah Docker sudah terinstal
 if ! command -v docker &> /dev/null; then
@@ -52,18 +52,31 @@ else
     echo_info "✅ Docker sudah terinstal."
 fi
 
+# Install jq jika belum ada
+if ! command -v jq &> /dev/null; then
+    echo_warn "🔴 jq tidak terinstal. Menginstal jq..."
+    sudo apt install jq -y
+else
+    echo_info "✅ jq sudah terinstal."
+fi
+
 # Cek apakah Docker Compose sudah terinstal
-if ! command -v docker-compose &> /dev/null; then
-    echo_warn "🔴 Docker Compose tidak terinstal. Menginstal Docker Compose versi terbaru..."
+echo_info "🔄 ${BOLD}Memeriksa versi Docker Compose...${RESET}"
+
+if ! command -v docker-compose &> /dev/null || ! docker-compose --version &> /dev/null; then
+    echo_warn "🔴 Docker Compose tidak terinstal atau versinya gagal. Menginstal ulang Docker Compose..."
+
+    # Menghapus Docker Compose yang ada jika ada masalah
+    sudo rm -f /usr/local/bin/docker-compose
 
     # Menginstal Docker Compose versi terbaru menggunakan curl
+    echo_info "⚙️ Menginstal Docker Compose versi terbaru..."
     sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     
     # Memberikan hak akses eksekusi pada file binary docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
-
 else
-    echo_info "✅ Docker Compose sudah terinstal."
+    echo_info "✅ Docker Compose sudah terinstal dan versi valid."
 fi
 
 # ============================================================
