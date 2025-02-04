@@ -46,6 +46,21 @@ sudo snap install multipass
 echo -e "\n>> Memeriksa versi Multipass..."
 multipass --version
 
+# Periksa dan aktifkan nested virtualization
+echo -e "\n>> Memeriksa dan mengaktifkan nested virtualization..."
+if ! grep -q "vmx" /proc/cpuinfo; then
+  echo -e "\n** CPU Anda tidak mendukung virtualisasi atau tidak diaktifkan. Pastikan virtualisasi di BIOS diaktifkan. **"
+  exit 1
+fi
+
+# Aktifkan nested virtualization untuk KVM
+if ! grep -q "virt" /sys/module/kvm_intel/parameters/nested; then
+  echo -e "\n>> Mengaktifkan nested virtualization..."
+  echo "options kvm-intel nested=1" | sudo tee /etc/modprobe.d/kvm-intel.conf
+  sudo modprobe -r kvm-intel
+  sudo modprobe kvm-intel
+fi
+
 # Download paket instalasi
 echo -e "\n>> Mengunduh paket instalasi Titan Agent..."
 wget https://pcdn.titannet.io/test4/bin/agent-linux.zip
