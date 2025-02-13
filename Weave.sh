@@ -3,6 +3,9 @@
 # Hentikan eksekusi jika ada error
 set -e
 
+# Versi Initia Weave
+WEAVE_VERSION="v0.1.4"
+
 # Fungsi: Menampilkan header
 print_header() {
   echo -e "\n============================================================"
@@ -44,12 +47,15 @@ install_go() {
   mkdir -p ~/go/bin
 }
 
-# Fungsi: Clone dan instal Initia Weave
+# Fungsi: Clone dan instal Initia Weave versi terbaru
 install_weave() {
-  echo -e "\n[3/6] Mengunduh dan menginstal Initia Weave...\n"
+  echo -e "\n[3/6] Mengunduh dan menginstal Initia Weave versi $WEAVE_VERSION...\n"
+  if [ -d "weave" ]; then
+    rm -rf weave
+  fi
   git clone https://github.com/initia-labs/weave.git
   cd weave
-  git checkout tags/v0.1.1
+  git checkout tags/$WEAVE_VERSION
   make install
   cd ..
 }
