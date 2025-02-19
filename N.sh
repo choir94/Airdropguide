@@ -38,9 +38,10 @@ echo "Menambahkan rust-src..."
 rustup component add rust-src
 
 # Menghapus setup.rs lama jika ada
-if [ -f "$HOME/.nexus/network-api/clients/cli/src/setup.rs" ]; then
+SETUP_FILE="$HOME/.nexus/network-api/clients/cli/src/setup.rs"
+if [ -f "$SETUP_FILE" ]; then
     echo "Menghapus file setup.rs lama..."
-    rm -f "$HOME/.nexus/network-api/clients/cli/src/setup.rs"
+    rm -f "$SETUP_FILE"
 fi
 
 # Meminta input Node ID dari pengguna dan memastikan tidak kosong
@@ -51,11 +52,11 @@ while [[ -z "$NODE_ID" ]]; do
     fi
 done
 
-# Membuat file setup.rs baru dengan Node ID
+# Membuat file setup.rs baru
 echo "Membuat file setup.rs baru..."
 mkdir -p "$HOME/.nexus/network-api/clients/cli/src/"
 
-cat <<EOL > "$HOME/.nexus/network-api/clients/cli/src/setup.rs"
+cat <<EOL > "$SETUP_FILE"
 use colored::Colorize;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
@@ -140,12 +141,12 @@ fn main() {
 }
 EOL
 
-echo "File setup.rs berhasil dibuat di $HOME/.nexus/network-api/clients/cli/src/setup.rs"
+echo "File setup.rs berhasil dibuat di $SETUP_FILE"
 
-# Menjalankan ulang Nexus CLI dalam screen
-echo "Menjalankan ulang Nexus CLI dalam screen dengan nama 'nexus'..."
+# Menjalankan ulang Nexus CLI dalam screen dengan perintah yang baru
+echo "Menjalankan ulang Nexus CLI dalam screen dengan perintah yang baru..."
 screen -S nexus -X quit || true  # Menghentikan screen jika sudah ada
-screen -dmS nexus bash -c "nexus-cli --start --beta | tee nexus.log"
+screen -dmS nexus bash -c "cd ~/.nexus/network-api/clients/cli && cargo run --release -- --start --beta"
 
 echo "Nexus CLI telah dijalankan ulang!"
 echo "Untuk melihat proses Nexus CLI, gunakan perintah: screen -r nexus"
