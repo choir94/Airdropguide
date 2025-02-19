@@ -28,21 +28,12 @@ rustup target add riscv32i-unknown-none-elf
 echo "Menambahkan rust-src..."
 rustup component add rust-src
 
-# Memeriksa dan menginstal Nexus CLI
-echo "Mengunduh dan menginstal Nexus CLI..."
-if ! command -v nexus-cli &> /dev/null; then
-    curl https://cli.nexus.xyz/ | sh
-fi
-
-# Menghapus setup.rs setelah menginstal Nexus CLI
+# Menghapus setup.rs lama jika ada
 echo "Menghapus file setup.rs lama..."
 rm -f "$SETUP_FILE"
 
-# Meminta pengguna memasukkan Node ID
-read -p "Masukkan Node ID: " NODE_ID
-
-# Membuat file setup.rs baru dengan Node ID yang telah dimasukkan
-echo "Membuat file setup.rs baru dengan Node ID: $NODE_ID..."
+# Membuat file setup.rs baru
+echo "Membuat file setup.rs baru..."
 mkdir -p "$(dirname "$SETUP_FILE")"
 
 cat <<EOL > "$SETUP_FILE"
@@ -85,7 +76,6 @@ pub async fn run_initial_setup() -> SetupResult {
         ProjectDirs::from("xyz", "nexus", "cli").expect("Failed to determine config directory");
     let config_path = proj_dirs.config_dir().join("user.json");
 
-    // Cek apakah ada konfigurasi yang sudah tersimpan
     if config_path.exists() {
         println!("\nThis node is already connected to an account");
 
@@ -107,17 +97,9 @@ pub async fn run_initial_setup() -> SetupResult {
         }
     }
 
-    // Menggunakan Node ID yang dimasukkan pengguna dalam skrip Bash
-    let node_id = "$NODE_ID".to_string();
-    println!("Using predefined node ID: {}", node_id);
+    println!("No existing Node ID found. Please configure your node.");
 
-    match save_node_id(&node_id) {
-        Ok(_) => SetupResult::Connected(node_id),
-        Err(e) => {
-            println!("{}", format!("Failed to save node ID: {}", e).red());
-            SetupResult::Invalid
-        }
-    }
+    SetupResult::Anonymous
 }
 
 pub fn clear_user_config() -> std::io::Result<()> {
@@ -134,12 +116,13 @@ pub fn clear_user_config() -> std::io::Result<()> {
 }
 EOL
 
-echo "File setup.rs berhasil dibuat dengan Node ID yang dimasukkan!"
+echo "File setup.rs berhasil dibuat di $SETUP_FILE"
 
-# Menjalankan Nexus CLI dalam screen
-echo "Menjalankan Nexus CLI dalam screen dengan nama 'nexus'..."
+# Menjalankan ulang Nexus CLI dalam screen
+echo "Menjalankan ulang Nexus CLI dalam screen dengan nama 'nexus'..."
+screen -S nexus -X quit || true  # Menghentikan screen jika sudah ada
 screen -dmS nexus bash -c "nexus-cli --start --beta | tee nexus.log"
 
-echo "Instalasi selesai!"
+echo "Nexus CLI telah dijalankan ulang!"
 echo "Untuk melihat proses Nexus CLI, gunakan perintah: screen -r nexus"
 echo "Untuk keluar dari screen tanpa menghentikan proses, tekan Ctrl+A, lalu D."
