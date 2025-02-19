@@ -11,7 +11,19 @@ sudo apt update && sudo apt upgrade -y
 
 # Menginstal dependensi yang diperlukan
 echo "Menginstal dependensi..."
-sudo apt install -y curl git build-essential libssl-dev pkg-config screen
+sudo apt install -y curl git build-essential libssl-dev pkg-config unzip screen
+
+# Mengecek apakah protoc sudah terinstal
+if ! command -v protoc &> /dev/null; then
+    echo "protoc tidak ditemukan, menginstal versi 29.3..."
+    wget https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip
+    unzip protoc-29.3-linux-x86_64.zip
+    sudo mv bin/protoc /usr/local/bin/
+    sudo mv include/* /usr/local/include/
+    rm -rf bin include protoc-29.3-linux-x86_64.zip
+else
+    echo "protoc sudah terinstal, melewati langkah instalasi."
+fi
 
 # Memeriksa dan menginstal Rust jika belum ada
 echo "Menginstal Rust dan Cargo..."
@@ -28,11 +40,20 @@ rustup target add riscv32i-unknown-none-elf
 echo "Menambahkan rust-src..."
 rustup component add rust-src
 
+# Meminta input Node ID dari pengguna
+read -p "Masukkan Node ID Anda: " NODE_ID
+
+# Validasi input
+if [[ -z "$NODE_ID" ]]; then
+    echo "Node ID tidak boleh kosong. Silakan coba lagi."
+    exit 1
+fi
+
 # Menghapus setup.rs lama jika ada
 echo "Menghapus file setup.rs lama..."
 rm -f "$SETUP_FILE"
 
-# Membuat file setup.rs baru
+# Membuat file setup.rs baru dengan Node ID
 echo "Membuat file setup.rs baru..."
 mkdir -p "$(dirname "$SETUP_FILE")"
 
@@ -113,6 +134,11 @@ pub fn clear_user_config() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn main() {
+    let node_id = "$NODE_ID";
+    save_node_id(node_id).expect("Failed to save Node ID");
 }
 EOL
 
