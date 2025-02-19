@@ -2,9 +2,6 @@
 
 set -e
 
-# Menentukan path file setup.rs
-SETUP_FILE="$HOME/.nexus/network-api/clients/cli/src/setup.rs"
-
 # Memastikan sistem diperbarui
 echo "Memperbarui sistem..."
 sudo apt update && sudo apt upgrade -y
@@ -40,24 +37,25 @@ rustup target add riscv32i-unknown-none-elf
 echo "Menambahkan rust-src..."
 rustup component add rust-src
 
-# Meminta input Node ID dari pengguna
-read -p "Masukkan Node ID Anda: " NODE_ID
-
-# Validasi input
-if [[ -z "$NODE_ID" ]]; then
-    echo "Node ID tidak boleh kosong. Silakan coba lagi."
-    exit 1
+# Menghapus setup.rs lama jika ada
+if [ -f "$HOME/.nexus/network-api/clients/cli/src/setup.rs" ]; then
+    echo "Menghapus file setup.rs lama..."
+    rm -f "$HOME/.nexus/network-api/clients/cli/src/setup.rs"
 fi
 
-# Menghapus setup.rs lama jika ada
-echo "Menghapus file setup.rs lama..."
-rm -f "$SETUP_FILE"
+# Meminta input Node ID dari pengguna dan memastikan tidak kosong
+while [[ -z "$NODE_ID" ]]; do
+    read -p "Masukkan Node ID Anda: " NODE_ID
+    if [[ -z "$NODE_ID" ]]; then
+        echo "Node ID tidak boleh kosong. Silakan masukkan kembali."
+    fi
+done
 
 # Membuat file setup.rs baru dengan Node ID
 echo "Membuat file setup.rs baru..."
-mkdir -p "$(dirname "$SETUP_FILE")"
+mkdir -p "$HOME/.nexus/network-api/clients/cli/src/"
 
-cat <<EOL > "$SETUP_FILE"
+cat <<EOL > "$HOME/.nexus/network-api/clients/cli/src/setup.rs"
 use colored::Colorize;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
@@ -142,7 +140,7 @@ fn main() {
 }
 EOL
 
-echo "File setup.rs berhasil dibuat di $SETUP_FILE"
+echo "File setup.rs berhasil dibuat di $HOME/.nexus/network-api/clients/cli/src/setup.rs"
 
 # Menjalankan ulang Nexus CLI dalam screen
 echo "Menjalankan ulang Nexus CLI dalam screen dengan nama 'nexus'..."
