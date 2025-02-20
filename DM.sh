@@ -57,8 +57,8 @@ input_required_details() {
     read -p "Masukkan RPC URL (default: https://testnet-rpc.monad.xyz): " RPC_URL
     RPC_URL="${RPC_URL:-https://testnet-rpc.monad.xyz}"
 
-    read -p "Masukkan Explorer URL (default: https://testnet-explorer.monad.xyz/): " EXPLORER_URL
-    EXPLORER_URL="${EXPLORER_URL:-https://testnet-explorer.monad.xyz/}"
+    read -p "Masukkan Explorer URL (default: https://explorer.monadscan.xyz/): " EXPLORER_URL
+    EXPLORER_URL="${EXPLORER_URL:-https://explorer.monadscan.xyz/}"
 
     mkdir -p "$SCRIPT_DIR/token_deployment"
     cat <<EOL > "$SCRIPT_DIR/token_deployment/.env"
@@ -150,4 +150,3 @@ input_required_details
 deploy_contract
 
 echo -e "${YELLOW}-----------------------------------${RESET}"
-echo -e "${BLUE}Gabung di channel Telegram untuk update dan bantuan: https://t.me/airdrop_node${RESET}"
