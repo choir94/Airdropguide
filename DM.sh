@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Skrip instalasi logo
+curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
+sleep 5
+
 # Warna untuk output
 BLUE='\033[0;34m'
 WHITE='\033[0;97m'
@@ -57,8 +61,8 @@ input_required_details() {
     read -p "Masukkan RPC URL (default: https://testnet-rpc.monad.xyz): " RPC_URL
     RPC_URL="${RPC_URL:-https://testnet-rpc.monad.xyz}"
 
-    read -p "Masukkan Explorer URL (default: https://explorer.monadscan.xyz/): " EXPLORER_URL
-    EXPLORER_URL="${EXPLORER_URL:-https://explorer.monadscan.xyz/}"
+    read -p "Masukkan Explorer URL (default: https://testnet.monadexplorer.com/): " EXPLORER_URL
+    EXPLORER_URL="${EXPLORER_URL:-https://testnet.monadexplorer.com/}"
 
     mkdir -p "$SCRIPT_DIR/token_deployment"
     cat <<EOL > "$SCRIPT_DIR/token_deployment/.env"
@@ -150,3 +154,4 @@ input_required_details
 deploy_contract
 
 echo -e "${YELLOW}-----------------------------------${RESET}"
+echo -e "${BLUE}Gabung di channel Telegram untuk update dan bantuan: https://t.me/airdrop_node${RESET}"
