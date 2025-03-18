@@ -14,6 +14,10 @@ EXECUTOR_USER=${EXECUTOR_USER:-root}
 read -sp "Enter your PRIVATE_KEY_LOCAL: " PRIVATE_KEY_LOCAL
 echo ""
 
+# Prompt for dynamic fee configuration
+read -p "Enter the maximum L3 gas price (default: 500): " EXECUTOR_MAX_L3_GAS_PRICE
+EXECUTOR_MAX_L3_GAS_PRICE=${EXECUTOR_MAX_L3_GAS_PRICE:-500}
+
 INSTALL_DIR="/home/$EXECUTOR_USER/t3rn"
 ENV_FILE="/etc/t3rn-executor.env"
 
@@ -38,6 +42,19 @@ EOL
 sudo chown -R "$EXECUTOR_USER":"$EXECUTOR_USER" "$INSTALL_DIR"
 sudo chmod 600 "$ENV_FILE"
 
+# Display configuration
+echo ""
+echo "======================================"
+echo "🔍 Configuration Summary:"
+echo "--------------------------------------"
+echo "User: $EXECUTOR_USER"
+echo "Install Directory: $INSTALL_DIR"
+echo "Environment File: $ENV_FILE"
+echo "RPC Endpoints: (Defined in $ENV_FILE)"
+echo "Max L3 Gas Price: $EXECUTOR_MAX_L3_GAS_PRICE"
+echo "======================================"
+echo ""
+
 # Start executor inside a screen session named "t3rn"
 echo "🖥️ Launching t3rn Executor in a screen session..."
 screen -dmS t3rn bash -c "cd $INSTALL_DIR/executor/executor/bin && \
@@ -47,7 +64,7 @@ screen -dmS t3rn bash -c "cd $INSTALL_DIR/executor/executor/bin && \
     EXECUTOR_PROCESS_BIDS_ENABLED=true \
     EXECUTOR_PROCESS_ORDERS_ENABLED=true \
     EXECUTOR_PROCESS_CLAIMS_ENABLED=true \
-    EXECUTOR_MAX_L3_GAS_PRICE=100 \
+    EXECUTOR_MAX_L3_GAS_PRICE=$EXECUTOR_MAX_L3_GAS_PRICE \
     PRIVATE_KEY_LOCAL=$PRIVATE_KEY_LOCAL \
     ENABLED_NETWORKS=arbitrum-sepolia,base-sepolia,optimism-sepolia,l2rn \
     EXECUTOR_PROCESS_PENDING_ORDERS_FROM_API=true \
