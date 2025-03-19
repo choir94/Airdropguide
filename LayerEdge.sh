@@ -1,63 +1,61 @@
 #!/bin/bash
 
-set -e  # Hentikan skrip jika ada error
+set -e  # Stop jika ada error
 
 # Menampilkan logo
-echo "🔹 Fetching and displaying logo..."
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
-sleep 5  # Memberikan waktu untuk melihat logo
+sleep 3
 
-echo ""
-echo "==============================================="
-echo "      🚀 INSTALLING LAYER EDGE LIGHT NODE      "
-echo "==============================================="
-echo ""
+echo -e "\n🔹 \e[1;36mLayer Edge Light Node Installer\e[0m 🔹\n"
 
-# 🔹 Updating system and installing dependencies
-echo -e "\n🔹 Updating system and installing dependencies...\n"
-sudo apt update && sudo apt install -y curl build-essential git screen
-
-# 🔹 Checking & Installing Go
-if ! command -v go &>/dev/null; then
-    echo -e "\n🔹 Installing Go...\n"
-    curl -fsSL https://golang.org/dl/go1.18.linux-amd64.tar.gz | sudo tar -xz -C /usr/local
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-    source ~/.bashrc
-fi
-
-# 🔹 Checking & Installing Rust
-if ! command -v rustc &>/dev/null; then
-    echo -e "\n🔹 Installing Rust...\n"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source $HOME/.cargo/env
-fi
-
-# 🔹 Checking & Installing RISC0 Toolchain (rzup)
-echo -e "\n🔹 Checking if 'rzup' is installed...\n"
-if ! command -v rzup &>/dev/null; then
-    echo -e "\n'🔹 rzup' not found. Installing...\n"
-    curl -L https://risczero.com/install | bash && rzup install
-    if [ -f "$HOME/.risc0/bin/rzup" ]; then
-        echo -e "\n✅ 'rzup' installed successfully. Adding to PATH...\n"
-        export PATH=$HOME/.risc0/bin:$PATH
-        echo 'export PATH=$HOME/.risc0/bin:$PATH' >> ~/.bashrc
-        echo 'export PATH=$HOME/.risc0/bin:$PATH' >> ~/.profile
-        source ~/.bashrc
+# Meminta Private Key secara interaktif
+while true; do
+    read -s -p "🔑 Masukkan Private Key Anda: " PRIVATE_KEY
+    echo
+    read -s -p "🔑 Konfirmasi Private Key: " PRIVATE_KEY_CONFIRM
+    echo
+    if [ "$PRIVATE_KEY" == "$PRIVATE_KEY_CONFIRM" ]; then
+        echo -e "\n✅ \e[1;32mPrivate Key berhasil disimpan!\e[0m"
+        break
     else
-        echo -e "\n❌ Installation failed. Please check manually.\n"
-        exit 1
+        echo -e "\n❌ \e[1;31mPrivate Key tidak cocok! Coba lagi.\e[0m"
     fi
-else
-    echo -e "\n✅ 'rzup' is already installed.\n"
+done
+
+echo -e "\n🔹 \e[1;34mMemeriksa dan menginstal dependencies...\e[0m\n"
+
+# Update dan install paket dasar
+apt update && apt install -y curl git screen jq
+
+# Instal Go jika belum ada
+if ! command -v go &> /dev/null; then
+    echo -e "\n🔹 \e[1;33mMenginstal Go...\e[0m\n"
+    curl -OL https://golang.org/dl/go1.18.10.linux-amd64.tar.gz
+    tar -C /usr/local -xzf go1.18.10.linux-amd64.tar.gz
+    export PATH=$PATH:/usr/local/go/bin
+    echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
 fi
 
-# 🔹 Input Private Key
-echo -e "\n🔹 Please enter your PRIVATE KEY:"
-read -s PRIVATE_KEY  # Input dengan mode tersembunyi
+# Instal Rust jika belum ada
+if ! command -v rustc &> /dev/null; then
+    echo -e "\n🔹 \e[1;33mMenginstal Rust...\e[0m\n"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+fi
 
-# 🔹 Configuring Environment Variables
-echo -e "\n🔹 Configuring environment variables...\n"
-cat <<EOF > ~/.layer_edge_env
+# Instal RISC Zero Toolchain jika belum ada
+if ! command -v rzup &> /dev/null; then
+    echo -e "\n🔹 \e[1;33mMenginstal RISC Zero Toolchain...\e[0m\n"
+    curl -L https://risczero.com/install | bash && rzup install || {
+        echo -e "\n⚠️ Instalasi 'rzup' gagal, mencoba kembali...\n"
+        source "$HOME/.bashrc"
+        rzup install
+    }
+fi
+
+# Konfigurasi Environment Variables
+echo -e "\n🔹 \e[1;34mMengatur variabel lingkungan...\e[0m\n"
+cat <<EOF > ~/.layeredge_env
 export GRPC_URL=34.31.74.109:9090
 export CONTRACT_ADDR=cosmos1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqt56709
 export ZK_PROVER_URL=http://127.0.0.1:3001
@@ -65,56 +63,45 @@ export API_REQUEST_TIMEOUT=100
 export POINTS_API=http://127.0.0.1:8080
 export PRIVATE_KEY='$PRIVATE_KEY'
 EOF
+source ~/.layeredge_env
 
-echo 'source ~/.layer_edge_env' >> ~/.bashrc
-source ~/.layer_edge_env
-
-# 🔹 Clone & Build Layer Edge Light Node
-echo -e "\n🔹 Cloning Layer Edge Light Node repository...\n"
+# Clone repositori jika belum ada
 if [ ! -d "layer-edge-light-node" ]; then
-    git clone https://github.com/layeredge/light-node.git layer-edge-light-node
+    echo -e "\n🔹 \e[1;34mCloning Layer Edge Light Node repository...\e[0m\n"
+    GIT_ASKPASS=/bin/echo git clone --depth=1 https://github.com/layeredge/light-node.git layer-edge-light-node
 fi
 
-cd layer-edge-light-node
-echo -e "\n🔹 Building Light Node...\n"
-go build
-cd ..
-
-# 🔹 Clone & Build RISC0 Merkle Service
-echo -e "\n🔹 Cloning and building RISC0 Merkle Service...\n"
 if [ ! -d "risc0-merkle-service" ]; then
-    git clone https://github.com/risczero/merkle-service.git risc0-merkle-service
+    echo -e "\n🔹 \e[1;34mCloning RISC0 Merkle Service repository...\e[0m\n"
+    git clone --depth=1 https://github.com/risczero/merkle-service.git risc0-merkle-service
 fi
 
-cd risc0-merkle-service
-cargo build
-cd ..
+# Build dan Jalankan RISC0 Merkle Service
+echo -e "\n🔹 \e[1;34mMenjalankan Merkle Service...\e[0m\n"
+screen -dmS risc0_merkle_service bash -c "cd risc0-merkle-service && cargo build && cargo run"
 
-echo -e "\n✅ Installation complete!\n"
-
-# 🔹 Running Merkle Service in Screen
-echo -e "\n🔹 Starting RISC0 Merkle Service...\n"
-screen -dmS merkle_service bash -c "cd risc0-merkle-service && cargo run"
-
-# 🔹 Waiting until Merkle Service is running
-echo -e "\n🔹 Waiting for Merkle Service to be fully up...\n"
-while ! nc -z 127.0.0.1 3001; do
-    echo "⏳ Waiting for Merkle Service (port 3001)..."
-    sleep 2
+# Menunggu server RISC0 aktif
+echo -e "\n⏳ \e[1;33mMenunggu RISC0 Merkle Service siap...\e[0m\n"
+for i in {1..30}; do  # Cek maksimal 30 kali (sekitar 30 detik)
+    if curl -s http://127.0.0.1:3001/health | jq .status | grep -q "ok"; then
+        echo -e "\n✅ \e[1;32mRISC0 Merkle Service aktif!\e[0m\n"
+        break
+    fi
+    sleep 1
 done
-echo -e "\n✅ Merkle Service is running!\n"
 
-# 🔹 Running Layer Edge Light Node in Screen
-echo -e "\n🔹 Starting Layer Edge Light Node...\n"
-screen -dmS light_node bash -c "cd layer-edge-light-node && ./light-node"
+# Jalankan Layer Edge Light Node hanya jika RISC0 aktif
+if curl -s http://127.0.0.1:3001/health | jq .status | grep -q "ok"; then
+    echo -e "\n🔹 \e[1;34mMenjalankan Light Node...\e[0m\n"
+    screen -dmS layeredge_light_node bash -c "cd layer-edge-light-node && go build && ./light-node"
+    echo -e "\n✅ \e[1;32mLayer Edge Light Node berjalan!\e[0m\n"
+else
+    echo -e "\n❌ \e[1;31mGagal menjalankan Layer Edge Light Node. RISC0 Merkle Service tidak aktif!\e[0m\n"
+    exit 1
+fi
 
-echo -e "\n✅ Both services are running in background screens!\n"
-echo "==============================================="
-echo "  🎯 Use the following commands to monitor:"
-echo "==============================================="
-echo "  📌 Merkle Service: screen -r merkle_service"
-echo "  📌 Light Node: screen -r light_node"
-echo ""
-echo "  🔄 Exit screen without stopping process: Press CTRL + A, then D"
-echo "  ❌ Stop screens: screen -S merkle_service -X quit && screen -S light_node -X quit"
-echo ""
+# Menampilkan petunjuk monitoring
+echo -e "\n✅ \e[1;32mSemua layanan sudah berjalan di dalam screen!\e[0m\n"
+echo -e "Gunakan perintah berikut untuk melihat log:\n"
+echo -e "  \e[1;33mscreen -r risc0_merkle_service\e[0m  # Untuk melihat Merkle Service"
+echo -e "  \e[1;33mscreen -r layeredge_light_node\e[0m  # Untuk melihat Light Node"
