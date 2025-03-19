@@ -99,8 +99,8 @@ if [ -z "$user_private_key" ]; then
     echo -e "${RED}Menggunakan default PRIVATE_KEY='cli-node-private-key'. Ganti manual di .env jika perlu.${NC}"
 fi
 
-# Buat file .env dengan konfigurasi default dan private key pengguna
-echo "Membuat file .env dengan konfigurasi..."
+# Buat file .env di direktori light-node
+echo "Membuat file .env di direktori light-node..."
 cat <<EOL > .env
 GRPC_URL=34.31.74.109:9090
 CONTRACT_ADDR=cosmos1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqt56709
@@ -109,7 +109,8 @@ API_REQUEST_TIMEOUT=100
 POINTS_API=http://127.0.0.1:8080
 PRIVATE_KEY='$user_private_key'
 EOL
-check_status "membuat file .env"
+check_status "membuat file .env di ~/light-node"
+echo -e "${GREEN}File .env tersedia di: ~/light-node/.env${NC}"
 
 # Jalankan risc0-merkle-service di screen
 echo "Membangun dan menjalankan risc0-merkle-service di screen..."
@@ -119,10 +120,13 @@ echo "Menunggu 2 menit agar risc0-merkle-service aktif sepenuhnya..."
 sleep 120  # Tunggu 120 detik (2 menit)
 check_status "menjalankan risc0-merkle-service"
 
-# Kembali ke root dan jalankan light-node di screen
-echo "Membangun dan menjalankan light-node di screen..."
+# Kembali ke direktori light-node, bangun, dan jalankan light-node di screen
+echo "Membangun light-node dengan go build..."
 cd ..
 go build
+check_status "membangun light-node"
+
+echo "Menjalankan light-node di screen dari direktori ~/light-node..."
 screen -dmS light-node bash -c "./light-node; exec bash"
 check_status "menjalankan light-node"
 
@@ -131,3 +135,4 @@ echo "Periksa status dengan:"
 echo "  - screen -r risc0-merkle (untuk risc0-merkle-service)"
 echo "  - screen -r light-node (untuk light-node)"
 echo "Keluar dari screen dengan Ctrl+A lalu D."
+echo -e "${GREEN}Catatan: Untuk menjalankan manual, gunakan: cd ~/light-node && go build && ./light-node${NC}"
