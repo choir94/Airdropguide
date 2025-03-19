@@ -1,168 +1,133 @@
 #!/bin/bash
 
 # Warna untuk output
-GREEN='\033[0;32m'
 RED='\033[0;31m'
-YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # Tampilkan logo dari URL
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
-sleep 3
+sleep 3  # Jeda 3 detik setelah logo
 
-echo -e "${GREEN}=== Mulai Instalasi Auto Script ===${NC}"
-
-# Fungsi untuk memeriksa perintah
-check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo -e "${RED}$1 tidak ditemukan. Silakan instal $1 terlebih dahulu.${NC}"
-        exit 1
+# Fungsi untuk memeriksa apakah perintah berhasil
+check_status() {
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ $1 berhasil${NC}"
     else
-        echo -e "${GREEN}$1 terdeteksi.${NC}"
+        echo -e "${RED}✗ Gagal $1${NC}"
+        exit 1
     fi
 }
 
-# 1. Pengecekan Prasyarat
-echo -e "${GREEN}Memeriksa prasyarat...${NC}"
+echo "Mulai instalasi dependensi dan konfigurasi light-node..."
 
-# Cek Git
-check_command git
-
-# Cek Rust
-check_command rustc
-RUST_VERSION=$(rustc --version | cut -d' ' -f2)
-if [[ "$RUST_VERSION" < "1.81.0" ]]; then
-    echo -e "${RED}Rust versi $RUST_VERSION terdeteksi. Diperlukan versi 1.81.0 atau lebih tinggi.${NC}"
+# Perbarui sistem
+if ! command -v apt >/dev/null 2>&1; then
+    echo -e "${RED}Sistem tidak mendukung apt. Skrip ini untuk Ubuntu/Debian.${NC}"
     exit 1
-else
-    echo -e "${GREEN}Rust versi $RUST_VERSION memenuhi syarat.${NC}"
 fi
+echo "Memperbarui sistem..."
+sudo apt update && sudo apt upgrade -y
+check_status "memperbarui sistem"
 
-# Cek Go
-check_command go
-
-# Instal RISC Zero Toolchain jika belum ada
-echo -e "${GREEN}Memeriksa RISC Zero Toolchain...${NC}"
-if ! command -v rzup &> /dev/null; then
-    echo -e "\n${YELLOW}🔹 Menginstal RISC Zero Toolchain...${NC}\n"
-    curl -L https://risczero.com/install | bash && rzup install || {
-        echo -e "\n${RED}⚠️ Instalasi 'rzup' gagal, mencoba kembali...${NC}\n"
-        source "$HOME/.bashrc"
-        rzup install
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}Gagal menginstal RISC Zero Toolchain setelah mencoba ulang.${NC}"
-            exit 1
-        fi
-    }
-else
-    echo -e "${GREEN}RISC Zero Toolchain sudah terinstal.${NC}"
-fi
-
-# Cek dan Instal Screen jika belum ada (khusus Debian/Ubuntu)
-if ! command -v screen &> /dev/null; then
-    echo -e "${YELLOW}Screen tidak ditemukan. Menginstal screen...${NC}"
-    sudo apt-get update && sudo apt-get install -y screen
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Gagal menginstal screen. Silakan instal secara manual.${NC}"
-        exit 1
+# Cek dan instal dependensi dasar (git, curl, screen)
+echo "Memeriksa dan menginstal dependensi dasar jika belum ada..."
+for pkg in git curl screen; do
+    if ! command -v $pkg >/dev/null 2>&1; then
+        echo "Menginstal $pkg..."
+        sudo apt install -y $pkg
+        check_status "menginstal $pkg"
+    else
+        echo -e "${GREEN}$pkg sudah terinstal${NC}"
     fi
-    echo -e "${GREEN}Screen berhasil diinstal.${NC}"
+done
+
+# Cek dan instal Go 1.18+
+if ! command -v go >/dev/null 2>&1 || [ "$(go version | cut -d' ' -f3 | cut -d'.' -f2)" -lt 18 ]; then
+    echo "Menginstal Go 1.21.8 (memenuhi syarat 1.18+)..."
+    wget https://golang.org/dl/go1.21.8.linux-amd64.tar.gz
+    sudo tar -C /usr/local -xzf go1.21.8.linux-amd64.tar.gz
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    source ~/.bashrc
+    go version
+    check_status "menginstal Go"
 else
-    echo -e "${GREEN}Screen sudah terinstal.${NC}"
+    echo -e "${GREEN}Go $(go version) sudah terinstal dan memenuhi syarat${NC}"
 fi
 
-# 2. Clone Repository light-node
-echo -e "${GREEN}Mengkloning repository light-node...${NC}"
-if [ -d "light-node" ]; then
-    echo -e "${GREEN}Direktori light-node sudah ada. Melewati proses clone.${NC}"
+# Cek dan instal Rust 1.81.0+
+if ! command -v rustc >/dev/null 2>&1 || [ "$(rustc --version | cut -d' ' -f2 | cut -d'.' -f1).$(rustc --version | cut -d' ' -f2 | cut -d'.' -f2)" \< "1.81" ]; then
+    echo "Menginstal Rust 1.81.0 atau lebih tinggi..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source $HOME/.cargo/env
+    rustup update
+    rustc --version
+    check_status "menginstal Rust"
 else
+    echo -e "${GREEN}Rust $(rustc --version) sudah terinstal dan memenuhi syarat${NC}"
+fi
+
+# Cek dan instal RISC0 toolchain
+if ! command -v rzup >/dev/null 2>&1; then
+    echo "Menginstal RISC0 toolchain..."
+    curl -L https://risczero.com/install | bash
+    echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
+    source ~/.bashrc
+    rzup install
+    rzup --version
+    check_status "menginstal RISC0 toolchain"
+else
+    echo -e "${GREEN}RISC0 toolchain sudah terinstal${NC}"
+fi
+
+# Kloning repositori light-node jika belum ada
+if [ ! -d "light-node" ]; then
+    echo "Mengkloning repositori light-node..."
     git clone https://github.com/Layer-Edge/light-node.git
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Gagal mengkloning repository light-node.${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}Repository light-node berhasil dikloning.${NC}"
+    cd light-node || exit
+    check_status "mengkloning repositori"
+else
+    echo -e "${GREEN}Repositori light-node sudah ada${NC}"
+    cd light-node || exit
 fi
 
-# 3. Konfigurasi Variabel Lingkungan
-echo -e "${GREEN}Mengatur variabel lingkungan...${NC}"
-echo -e "${YELLOW}Masukkan Private Key untuk cli-node (kosongkan untuk default 'cli-node-private-key'): ${NC}"
-read -r PRIVATE_KEY_INPUT
-if [ -z "$PRIVATE_KEY_INPUT" ]; then
-    PRIVATE_KEY_INPUT="cli-node-private-key"
+# Minta pengguna memasukkan private key
+echo "Masukkan private key untuk light-node (kosongkan untuk menggunakan default 'cli-node-private-key'):"
+read -r user_private_key
+if [ -z "$user_private_key" ]; then
+    user_private_key="cli-node-private-key"
+    echo -e "${RED}Menggunakan default PRIVATE_KEY='cli-node-private-key'. Ganti manual di .env jika perlu.${NC}"
 fi
 
+# Buat file .env dengan konfigurasi default dan private key pengguna
+echo "Membuat file .env dengan konfigurasi..."
 cat <<EOL > .env
 GRPC_URL=34.31.74.109:9090
 CONTRACT_ADDR=cosmos1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqt56709
 ZK_PROVER_URL=http://127.0.0.1:3001
 API_REQUEST_TIMEOUT=100
 POINTS_API=http://127.0.0.1:8080
-PRIVATE_KEY='$PRIVATE_KEY_INPUT'
+PRIVATE_KEY='$user_private_key'
 EOL
-echo -e "${GREEN}File .env telah dibuat dengan Private Key: $PRIVATE_KEY_INPUT${NC}"
+check_status "membuat file .env"
 
-# Export variabel lingkungan untuk sesi ini
-export $(cat .env | xargs)
+# Jalankan risc0-merkle-service di screen
+echo "Membangun dan menjalankan risc0-merkle-service di screen..."
+cd risc0-merkle-service
+screen -dmS risc0-merkle bash -c "cargo build && cargo run; exec bash"
+echo "Menunggu 2 menit agar risc0-merkle-service aktif sepenuhnya..."
+sleep 120  # Tunggu 120 detik (2 menit)
+check_status "menjalankan risc0-merkle-service"
 
-# 4. Jalankan Server risc0-merkle-service dengan Screen
-echo -e "${GREEN}Membangun dan menjalankan risc0-merkle-service...${NC}"
-if [ -d "risc0-merkle-service" ]; then
-    cd risc0-merkle-service || {
-        echo -e "${RED}Gagal masuk ke direktori risc0-merkle-service.${NC}"
-        exit 1
-    }
-    cargo build
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Gagal membangun risc0-merkle-service.${NC}"
-        exit 1
-    fi
-    screen -dmS risc0-merkle-service cargo run
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}risc0-merkle-service berjalan di sesi screen 'risc0-merkle-service'.${NC}"
-        echo -e "${YELLOW}Gunakan 'screen -r risc0-merkle-service' untuk melihat output.${NC}"
-    else
-        echo -e "${RED}Gagal menjalankan risc0-merkle-service di screen.${NC}"
-        exit 1
-    fi
-    cd ..
-else
-    echo -e "${RED}Direktori risc0-merkle-service tidak ditemukan.${NC}"
-    exit 1
-fi
-
-# Tunggu beberapa detik agar server risc0 stabil
-sleep 5
-
-# 5. Jalankan Light Node dengan Screen
-echo -e "${GREEN}Membangun dan menjalankan light-node...${NC}"
-cd light-node || {
-    echo -e "${RED}Gagal masuk ke direktori light-node.${NC}"
-    exit 1
-}
-go build
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Gagal membangun light-node.${NC}"
-    exit 1
-fi
-screen -dmS light-node ./light-node
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}light-node berjalan di sesi screen 'light-node'.${NC}"
-    echo -e "${YELLOW}Gunakan 'screen -r light-node' untuk melihat output.${NC}"
-else
-    echo -e "${RED}Gagal menjalankan light-node di screen.${NC}"
-    exit 1
-fi
+# Kembali ke root dan jalankan light-node di screen
+echo "Membangun dan menjalankan light-node di screen..."
 cd ..
+go build
+screen -dmS light-node bash -c "./light-node; exec bash"
+check_status "menjalankan light-node"
 
-# 6. Verifikasi
-echo -e "${GREEN}Memastikan kedua server berjalan...${NC}"
-if screen -list | grep -q "risc0-merkle-service" && screen -list | grep -q "light-node"; then
-    echo -e "${GREEN}Instalasi dan peluncuran server berhasil!${NC}"
-    echo -e "${YELLOW}Sesi screen aktif: 'risc0-merkle-service' dan 'light-node'.${NC}"
-else
-    echo -e "${RED}Salah satu atau kedua server gagal berjalan di screen.${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}=== Selesai ===${NC}"
+echo -e "${GREEN}Instalasi dan peluncuran selesai!${NC}"
+echo "Periksa status dengan:"
+echo "  - screen -r risc0-merkle (untuk risc0-merkle-service)"
+echo "  - screen -r light-node (untuk light-node)"
+echo "Keluar dari screen dengan Ctrl+A lalu D."
