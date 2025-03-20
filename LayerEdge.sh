@@ -59,7 +59,7 @@ if ! command -v go >/dev/null 2>&1 || [ "$(go version | cut -d' ' -f3 | cut -d'.
     if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
         echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
     fi
-    export PATH=$PATH:/usr/local/go/bin  # Terapkan PATH di sesi saat ini
+    export PATH=$PATH:/usr/local/go/bin
     go version >> "$LOG_FILE" 2>&1
     check_status "menginstal Go"
 else
@@ -81,14 +81,11 @@ fi
 # Cek dan instal RISC0 toolchain
 if ! command -v rzup >/dev/null 2>&1; then
     echo "Menginstal RISC0 toolchain..."
-    # Jalankan instalasi dan simpan output ke log
     curl -L https://risczero.com/install | bash >> "$LOG_FILE" 2>&1
-    # Tambahkan PATH secara eksplisit
     if ! grep -q "$HOME/.risc0/bin" ~/.bashrc; then
         echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
     fi
-    export PATH=$PATH:$HOME/.risc0/bin  # Terapkan PATH di sesi saat ini
-    # Verifikasi instalasi sebelum melanjutkan
+    export PATH=$PATH:$HOME/.risc0/bin
     if ! command -v rzup >/dev/null 2>&1; then
         echo -e "${RED}✗ Instalasi RISC0 gagal. Periksa koneksi atau coba instal manual.${NC}"
         echo "Petunjuk: Jalankan 'curl -L https://risczero.com/install | bash' secara manual."
@@ -112,15 +109,17 @@ else
     cd light-node || exit
 fi
 
-# Minta pengguna memasukkan private key
+# Minta pengguna memasukkan private key dengan aman
 echo "Masukkan private key untuk light-node (kosongkan untuk menggunakan default 'cli-node-private-key'):"
-read -r user_private_key
+echo -n "Private Key: "
+read -s user_private_key  # Input disembunyikan
+echo ""  # Baris baru setelah input
 if [ -z "$user_private_key" ]; then
     user_private_key="cli-node-private-key"
     echo -e "${RED}Menggunakan default PRIVATE_KEY='cli-node-private-key'. Ganti manual di .env jika perlu.${NC}"
 fi
 
-# Buat file .env di direktori light-node
+# Buat file .env di direktori light-node dengan izin ketat
 echo "Membuat file .env di direktori light-node..."
 cat <<EOL > .env
 GRPC_URL=34.31.74.109:9090
@@ -131,7 +130,9 @@ POINTS_API=http://127.0.0.1:8080
 PRIVATE_KEY='$user_private_key'
 EOL
 check_status "membuat file .env di ~/light-node"
-echo -e "${GREEN}File .env tersedia di: ~/light-node/.env${NC}"
+# Batasi akses ke file .env (hanya pemilik yang bisa baca/tulis)
+chmod 600 .env
+echo -e "${GREEN}File .env tersedia di: ~/light-node/.env (dengan izin aman)${NC}"
 
 # Jalankan risc0-merkle-service di screen
 echo "Membangun dan menjalankan risc0-merkle-service di screen..."
@@ -158,3 +159,4 @@ echo "  - screen -r light-node (untuk light-node)"
 echo "Keluar dari screen dengan Ctrl+A lalu D."
 echo -e "${GREEN}Catatan: Untuk menjalankan manual, gunakan: cd ~/light-node && go build && ./light-node${NC}"
 echo "Log instalasi tersedia di: $LOG_FILE"
+echo -e "${GREEN}Keamanan: Private key disimpan di .env dengan izin ketat (chmod 600).${NC}"
