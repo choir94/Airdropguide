@@ -30,8 +30,7 @@ if ! command -v soundnessup &> /dev/null; then
     curl -sSL https://raw.githubusercontent.com/soundnesslabs/soundness-layer/main/soundnessup/install | bash
     source ~/.bashrc
 else
-    echo -e "${YELLOW}✅ Soundness CLI already installed. Checking for updates...${NC}"
-    soundnessup update
+    echo -e "${YELLOW}✅ Soundness CLI already installed.${NC}"
 fi
 
 # Pastikan Soundness CLI bisa diakses
