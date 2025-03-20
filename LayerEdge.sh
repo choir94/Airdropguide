@@ -5,16 +5,24 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+# File log untuk debugging
+LOG_FILE="$HOME/layeredge_install.log"
+echo "Log instalasi akan disimpan di: $LOG_FILE"
+echo "Instalasi dimulai pada $(date)" > "$LOG_FILE"
+
 # Tampilkan logo dari URL
-curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
+curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash >> "$LOG_FILE" 2>&1
 sleep 3  # Jeda 3 detik setelah logo
 
 # Fungsi untuk memeriksa apakah perintah berhasil
 check_status() {
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ $1 berhasil${NC}"
+        echo "[SUCCESS] $1 berhasil pada $(date)" >> "$LOG_FILE"
     else
         echo -e "${RED}✗ Gagal $1${NC}"
+        echo "[ERROR] Gagal $1 pada $(date)" >> "$LOG_FILE"
+        echo "Silakan periksa log di $LOG_FILE untuk detailnya."
         exit 1
     fi
 }
@@ -27,7 +35,7 @@ if ! command -v apt >/dev/null 2>&1; then
     exit 1
 fi
 echo "Memperbarui sistem..."
-sudo apt update && sudo apt upgrade -y
+sudo apt update && sudo apt upgrade -y >> "$LOG_FILE" 2>&1
 check_status "memperbarui sistem"
 
 # Cek dan instal dependensi dasar (git, curl, screen)
@@ -35,7 +43,7 @@ echo "Memeriksa dan menginstal dependensi dasar jika belum ada..."
 for pkg in git curl screen; do
     if ! command -v $pkg >/dev/null 2>&1; then
         echo "Menginstal $pkg..."
-        sudo apt install -y $pkg
+        sudo apt install -y $pkg >> "$LOG_FILE" 2>&1
         check_status "menginstal $pkg"
     else
         echo -e "${GREEN}$pkg sudah terinstal${NC}"
@@ -45,11 +53,14 @@ done
 # Cek dan instal Go 1.18+
 if ! command -v go >/dev/null 2>&1 || [ "$(go version | cut -d' ' -f3 | cut -d'.' -f2)" -lt 18 ]; then
     echo "Menginstal Go 1.21.8 (memenuhi syarat 1.18+)..."
-    wget https://golang.org/dl/go1.21.8.linux-amd64.tar.gz
-    sudo tar -C /usr/local -xzf go1.21.8.linux-amd64.tar.gz
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-    source ~/.bashrc
-    go version
+    wget https://golang.org/dl/go1.21.8.linux-amd64.tar.gz -O go.tar.gz >> "$LOG_FILE" 2>&1
+    sudo tar -C /usr/local -xzf go.tar.gz >> "$LOG_FILE" 2>&1
+    rm go.tar.gz
+    if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    fi
+    export PATH=$PATH:/usr/local/go/bin  # Terapkan PATH di sesi saat ini
+    go version >> "$LOG_FILE" 2>&1
     check_status "menginstal Go"
 else
     echo -e "${GREEN}Go $(go version) sudah terinstal dan memenuhi syarat${NC}"
@@ -58,10 +69,10 @@ fi
 # Cek dan instal Rust 1.81.0+
 if ! command -v rustc >/dev/null 2>&1 || [ "$(rustc --version | cut -d' ' -f2 | cut -d'.' -f1).$(rustc --version | cut -d' ' -f2 | cut -d'.' -f2)" \< "1.81" ]; then
     echo "Menginstal Rust 1.81.0 atau lebih tinggi..."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source $HOME/.cargo/env
-    rustup update
-    rustc --version
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y >> "$LOG_FILE" 2>&1
+    source "$HOME/.cargo/env"
+    rustup update >> "$LOG_FILE" 2>&1
+    rustc --version >> "$LOG_FILE" 2>&1
     check_status "menginstal Rust"
 else
     echo -e "${GREEN}Rust $(rustc --version) sudah terinstal dan memenuhi syarat${NC}"
@@ -70,20 +81,30 @@ fi
 # Cek dan instal RISC0 toolchain
 if ! command -v rzup >/dev/null 2>&1; then
     echo "Menginstal RISC0 toolchain..."
-    curl -L https://risczero.com/install | bash
-    echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
-    source ~/.bashrc
-    rzup install
-    rzup --version
+    # Jalankan instalasi dan simpan output ke log
+    curl -L https://risczero.com/install | bash >> "$LOG_FILE" 2>&1
+    # Tambahkan PATH secara eksplisit
+    if ! grep -q "$HOME/.risc0/bin" ~/.bashrc; then
+        echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
+    fi
+    export PATH=$PATH:$HOME/.risc0/bin  # Terapkan PATH di sesi saat ini
+    # Verifikasi instalasi sebelum melanjutkan
+    if ! command -v rzup >/dev/null 2>&1; then
+        echo -e "${RED}✗ Instalasi RISC0 gagal. Periksa koneksi atau coba instal manual.${NC}"
+        echo "Petunjuk: Jalankan 'curl -L https://risczero.com/install | bash' secara manual."
+        exit 1
+    fi
+    rzup install >> "$LOG_FILE" 2>&1
+    rzup --version >> "$LOG_FILE" 2>&1
     check_status "menginstal RISC0 toolchain"
 else
-    echo -e "${GREEN}RISC0 toolchain sudah terinstal${NC}"
+    echo -e "${GREEN}RISC0 toolchain sudah terinstal$(rzup --version)${NC}"
 fi
 
 # Kloning repositori light-node jika belum ada
 if [ ! -d "light-node" ]; then
     echo "Mengkloning repositori light-node..."
-    git clone https://github.com/Layer-Edge/light-node.git
+    git clone https://github.com/Layer-Edge/light-node.git >> "$LOG_FILE" 2>&1
     cd light-node || exit
     check_status "mengkloning repositori"
 else
@@ -114,16 +135,16 @@ echo -e "${GREEN}File .env tersedia di: ~/light-node/.env${NC}"
 
 # Jalankan risc0-merkle-service di screen
 echo "Membangun dan menjalankan risc0-merkle-service di screen..."
-cd risc0-merkle-service
+cd risc0-merkle-service || exit
 screen -dmS risc0-merkle bash -c "cargo build && cargo run; exec bash"
 echo "Menunggu 2 menit agar risc0-merkle-service aktif sepenuhnya..."
-sleep 120  # Tunggu 120 detik (2 menit)
+sleep 120
 check_status "menjalankan risc0-merkle-service"
 
 # Kembali ke direktori light-node, bangun, dan jalankan light-node di screen
 echo "Membangun light-node dengan go build..."
 cd ..
-go build
+go build >> "$LOG_FILE" 2>&1
 check_status "membangun light-node"
 
 echo "Menjalankan light-node di screen dari direktori ~/light-node..."
@@ -136,3 +157,4 @@ echo "  - screen -r risc0-merkle (untuk risc0-merkle-service)"
 echo "  - screen -r light-node (untuk light-node)"
 echo "Keluar dari screen dengan Ctrl+A lalu D."
 echo -e "${GREEN}Catatan: Untuk menjalankan manual, gunakan: cd ~/light-node && go build && ./light-node${NC}"
+echo "Log instalasi tersedia di: $LOG_FILE"
