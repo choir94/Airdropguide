@@ -1,5 +1,7 @@
 #!/bin/bash
-
+# Skrip instalasi logo
+curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
+sleep 5
 # Warna untuk output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
