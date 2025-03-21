@@ -99,9 +99,9 @@ PRIVATE_KEY='$user_private_key'
 EOL
 check_status "membuat file .env"
 
-# Jalankan risc0-merkle-service di screen (hanya jika ZK_PROVER_URL lokal)
-if grep -q "ZK_PROVER_URL=http://127.0.0.1:3001" .env; then
+# Jalankan risc0-merkle-service di screen
     echo "Menjalankan risc0-merkle-service di screen dari ~/light-node/risc0-merkle-service..."
+    cd ~/light-node
     cd risc0-merkle-service
     screen -dmS risc0-merkle bash -c "cargo build && cargo run; exec bash"
     cd ..
