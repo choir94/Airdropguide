@@ -62,18 +62,17 @@ curl -L https://risczero.com/install | bash
 echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
 source ~/.bashrc
 rzup install
-source ~/.bashrc
+check_status "menginstal RISC0 toolchain"
 
 # Kloning repositori light-node
-if [ ! -d "light-node" ]; then
+if [ ! -d "~/light-node" ]; then
     echo "Mengkloning repositori light-node..."
-    git clone https://github.com/Layer-Edge/light-node.git
-    cd light-node || exit
+    git clone https://github.com/Layer-Edge/light-node.git ~/light-node
     check_status "mengkloning repositori"
-else
-    echo -e "${GREEN}Repositori light-node sudah ada${NC}"
-    cd light-node || exit
 fi
+
+# Masuk ke folder light-node
+cd ~/light-node || exit
 
 # Minta private key dari pengguna dan hapus 0x jika ada
 echo "Masukkan private key untuk light-node (tanpa awalan '0x', kosongkan untuk default 'cli-node-private-key'):"
@@ -87,37 +86,34 @@ else
     echo -e "${GREEN}Private key diterima: $user_private_key${NC}"
 fi
 
-# Buat file .env dengan konfigurasi alternatif
+# Buat file .env dengan konfigurasi
 echo "Membuat file .env di ~/light-node..."
-cat <<EOL > .env
+cat <<EOL > ~/light-node/.env
 GRPC_URL=grpc.testnet.layeredge.io:9090
 CONTRACT_ADDR=cosmos1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqt56709
-ZK_PROVER_URL=https://layeredge.mintair.xyz/
 API_REQUEST_TIMEOUT=100
 POINTS_API=https://light-node.layeredge.io
 PRIVATE_KEY='$user_private_key'
 EOL
 check_status "membuat file .env"
 
-# Jalankan risc0-merkle-service di screen
-    echo "Menjalankan risc0-merkle-service di screen dari ~/light-node/risc0-merkle-service..."
-    cd ~/light-node
-    cd risc0-merkle-service
-    screen -dmS risc0-merkle bash -c "cargo build && cargo run; exec bash"
-    cd ..
-    echo "Menunggu 5 menit untuk risc0-merkle-service..."
-    sleep 300
-    check_status "menjalankan risc0-merkle-service"
-else
-    echo -e "${GREEN}Menggunakan ZK_PROVER_URL eksternal, melewati risc0-merkle-service lokal${NC}"
-fi
+# Masuk ke folder risc0-merkle-service
+cd ~/light-node/risc0-merkle-service || exit
 
-# Pastikan berada di direktori light-node sebelum menjalankan light-node
-echo "Memastikan direktori kerja adalah ~/light-node..."
+# Jalankan risc0-merkle-service di screen
+echo "Menjalankan risc0-merkle-service..."
+screen -dmS risc0-merkle bash -c "cargo build && cargo run; exec bash"
+check_status "menjalankan risc0-merkle-service"
+
+# Tunggu beberapa menit agar risc0-merkle-service siap
+echo "Menunggu 5 menit untuk risc0-merkle-service..."
+sleep 300
+
+# Pastikan kembali berada di direktori light-node sebelum menjalankan light-node
 cd ~/light-node || exit
 
 # Jalankan light-node di screen
-echo "Membangun dan menjalankan light-node di screen dari ~/light-node..."
+echo "Membangun dan menjalankan light-node..."
 go build
 check_status "membangun light-node"
 screen -dmS light-node bash -c "./light-node; exec bash"
@@ -125,6 +121,6 @@ check_status "menjalankan light-node"
 
 echo -e "${GREEN}Instalasi otomatis selesai!${NC}"
 echo "Periksa status dengan:"
-echo "  - screen -r risc0-merkle (jika ZK_PROVER_URL lokal)"
+echo "  - screen -r risc0-merkle"
 echo "  - screen -r light-node"
 echo "Keluar dari screen dengan Ctrl+A lalu D"
