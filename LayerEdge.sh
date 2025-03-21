@@ -99,13 +99,6 @@ PRIVATE_KEY='$user_private_key'
 EOL
 check_status "membuat file .env"
 
-# Hentikan sesi screen lama
-echo "Menghentikan sesi screen yang ada..."
-screen -ls | grep -E "(Detached|Attached)" | awk '{print $1}' | xargs -I {} screen -S {} -X quit
-pkill light-node
-pkill -f risc0-merkle
-check_status "menghentikan sesi screen lama"
-
 # Jalankan risc0-merkle-service di screen (hanya jika ZK_PROVER_URL lokal)
 if grep -q "ZK_PROVER_URL=http://127.0.0.1:3001" .env; then
     echo "Menjalankan risc0-merkle-service di screen dari ~/light-node/risc0-merkle-service..."
