@@ -29,22 +29,32 @@ echo "Menginstal dependensi dasar..."
 sudo apt install -y git curl screen
 check_status "menginstal dependensi dasar"
 
-# Instal Go 1.21.8
-echo "Menginstal Go 1.21.8..."
-wget https://golang.org/dl/go1.21.8.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.8.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-go version
-check_status "menginstal Go"
+# Cek dan instal Go (versi 1.21.6)
+if ! command -v go >/dev/null 2>&1 || [ "$(go version | cut -d' ' -f3 | cut -d'.' -f2)" -lt 21 ]; then
+    echo "Menginstal Go 1.21.6..."
+    wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
+    sudo tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
+    rm go1.21.6.linux-amd64.tar.gz
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    source ~/.bashrc
+    go version
+    check_status "menginstal Go"
+else
+    echo -e "${GREEN}Go $(go version) sudah terinstal dan memenuhi syarat (1.21.6 atau lebih tinggi)${NC}"
+fi
 
-# Instal Rust
-echo "Menginstal Rust..."
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source $HOME/.cargo/env
-rustup update
-rustc --version
-check_status "menginstal Rust"
+# Cek dan instal Rust (versi 1.85.1)
+if ! command -v rustc >/dev/null 2>&1 || [ "$(rustc --version | cut -d' ' -f2 | cut -d'.' -f1).$(rustc --version | cut -d' ' -f2 | cut -d'.' -f2)" \< "1.85" ]; then
+    echo "Menginstal Rust 1.85.1..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source $HOME/.cargo/env
+    rustup install 1.85.1
+    rustup default 1.85.1
+    rustc --version
+    check_status "menginstal Rust"
+else
+    echo -e "${GREEN}Rust $(rustc --version) sudah terinstal dan memenuhi syarat (1.85.1)${NC}"
+fi
 
 # Instal RISC0 toolchain
 echo "Menginstal RISC0 toolchain..."
@@ -52,8 +62,7 @@ curl -L https://risczero.com/install | bash
 echo 'export PATH=$PATH:$HOME/.risc0/bin' >> ~/.bashrc
 source ~/.bashrc
 rzup install
-rzup --version
-check_status "menginstal RISC0 toolchain"
+source ~/.bashrc
 
 # Kloning repositori light-node
 if [ ! -d "light-node" ]; then
