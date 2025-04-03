@@ -12,9 +12,9 @@ RESET='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit
 
-# Fungsi instalasi dependensi
+# Fungsi instalasi dan pembaruan dependensi
 install_dependencies() {
-    echo -e "${YELLOW}Menginstal dependensi...${RESET}"
+    echo -e "${YELLOW}Menginstal dan memperbarui dependensi...${RESET}"
 
     # Inisialisasi Git jika belum ada
     if [ ! -d ".git" ]; then
@@ -22,11 +22,24 @@ install_dependencies() {
         git init
     fi
 
-    # Instal Foundry jika belum terinstal
-    if ! command -v forge &> /dev/null; then
-        echo -e "${YELLOW}Foundry belum terinstal. Menginstal Foundry...${RESET}"
-        source <(wget -O - https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/Foundry.sh)
-    fi
+    # Hapus instalasi Foundry lama
+    echo -e "${YELLOW}Menghapus instalasi Foundry lama jika ada...${RESET}"
+    rm -rf /root/.foundry
+
+    # Instal Foundry dari sumber resmi
+    echo -e "${YELLOW}Menginstal Foundry...${RESET}"
+    curl -L https://foundry.paradigm.xyz | bash
+    source /root/.bashrc
+    foundryup
+
+    # Pastikan PATH mencakup Foundry
+    export PATH="$HOME/.foundry/bin:$PATH"
+    echo 'export PATH="$HOME/.foundry/bin:$PATH"' >> /root/.bashrc
+    source /root/.bashrc
+
+    # Periksa versi Foundry
+    echo -e "${BLUE}Versi Foundry saat ini:${RESET}"
+    /root/.foundry/bin/forge --version || { echo -e "${RED}Gagal memverifikasi instalasi Foundry. Pastikan instalasi berhasil.${RESET}"; exit 1; }
 
     # Instal OpenZeppelin Contracts jika belum ada
     if [ ! -d "$SCRIPT_DIR/lib/openzeppelin-contracts" ]; then
@@ -101,7 +114,7 @@ verify_contract() {
 
     # Verifikasi kontrak menggunakan forge dengan Blockscout
     echo -e "${BLUE}Memverifikasi kontrak menggunakan forge...${RESET}"
-    forge verify-contract \
+    /root/.foundry/bin/forge verify-contract \
         --rpc-url "$RPC_URL" \
         --verifier blockscout \
         --verifier-url "$VERIFIER_URL" \
@@ -113,6 +126,7 @@ verify_contract() {
         echo -e "${GREEN}Kontrak berhasil diverifikasi di Tea Sepolia Explorer!${RESET}"
     else
         echo -e "${RED}Verifikasi kontrak gagal untuk alamat $contract_address.${RESET}"
+        echo -e "${YELLOW}Pastikan kontrak sudah terdeploy dengan benar dan explorer telah tersinkronisasi.${RESET}"
     fi
 }
 
@@ -140,13 +154,13 @@ EOL
 
     # Kompilasi kontrak
     echo -e "${BLUE}Mengompilasi kontrak...${RESET}"
-    forge build || { echo -e "${RED}Kompilasi gagal.${RESET}"; exit 1; }
+    /root/.foundry/bin/forge build || { echo -e "${RED}Kompilasi gagal.${RESET}"; exit 1; }
 
     # Deploy kontrak
     for i in $(seq 1 "$NUM_CONTRACTS"); do
         echo -e "${BLUE}Mendeploy kontrak $i dari $NUM_CONTRACTS...${RESET}"
 
-        DEPLOY_OUTPUT=$(forge create "$SCRIPT_DIR/src/AirdropNode.sol:AirdropNode" \
+        DEPLOY_OUTPUT=$(/root/.foundry/bin/forge create "$SCRIPT_DIR/src/AirdropNode.sol:AirdropNode" \
             --rpc-url "$RPC_URL" \
             --private-key "$PRIVATE_KEY" \
             --broadcast)
@@ -158,8 +172,17 @@ EOL
 
         # Ambil alamat kontrak
         CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -oP 'Deployed to: \K(0x[a-fA-F0-9]{40})')
+        if [ -z "$CONTRACT_ADDRESS" ]; then
+            echo -e "${RED}Gagal mendapatkan alamat kontrak dari output deploy.${RESET}"
+            continue
+        fi
+
         echo -e "${YELLOW}Kontrak $i berhasil di-deploy di alamat: $CONTRACT_ADDRESS${RESET}"
         echo -e "${WHITE}Lihat kontrak di: ${BLUE}$EXPLORER_URL/address/$CONTRACT_ADDRESS${RESET}"
+
+        # Tunggu beberapa detik agar transaksi dikonfirmasi
+        echo -e "${YELLOW}Menunggu 10 detik untuk memastikan transaksi dikonfirmasi...${RESET}"
+        sleep 10
 
         # Verifikasi kontrak di Tea Sepolia Explorer
         verify_contract "$CONTRACT_ADDRESS"
