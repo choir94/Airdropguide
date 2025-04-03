@@ -59,13 +59,13 @@ input_required_details() {
     # Input private key
     read -p "Masukkan Private Key Anda: " PRIVATE_KEY
 
-    # Input RPC URL untuk Tea Layer
-    read -p "Masukkan RPC URL (default: https://assam-rpc.tea.xyz/): " RPC_URL
-    RPC_URL="${RPC_URL:-https://assam-rpc.tea.xyz/}"
+    # Input RPC URL untuk Tea Sepolia
+    read -p "Masukkan RPC URL (default: https://tea-sepolia.g.alchemy.com/public): " RPC_URL
+    RPC_URL="${RPC_URL:-https://tea-sepolia.g.alchemy.com/public}"
 
-    # Input Explorer URL untuk Tea Layer
-    read -p "Masukkan Explorer URL (default: https://assam.tea.xyz/): " EXPLORER_URL
-    EXPLORER_URL="${EXPLORER_URL:-https://assam.tea.xyz/}"
+    # Input Explorer URL untuk Tea Sepolia
+    read -p "Masukkan Explorer URL (default: https://sepolia.tea.xyz/): " EXPLORER_URL
+    EXPLORER_URL="${EXPLORER_URL:-https://sepolia.tea.xyz/}"
 
     # Simpan input ke file .env
     mkdir -p "$SCRIPT_DIR/token_deployment"
@@ -76,6 +76,8 @@ TOKEN_SYMBOL="$TOKEN_SYMBOL"
 NUM_CONTRACTS="$NUM_CONTRACTS"
 RPC_URL="$RPC_URL"
 EXPLORER_URL="$EXPLORER_URL"
+VERIFIER_URL="https://sepolia.tea.xyz/api/"
+CHAIN_ID="10218"
 EOL
 
     # Konfigurasi foundry.toml
@@ -95,12 +97,9 @@ EOL
 # Fungsi untuk verifikasi kontrak di Blockscout
 verify_contract() {
     local contract_address="$1"
-    echo -e "${YELLOW}Memulai verifikasi kontrak di Blockscout untuk: $contract_address${RESET}"
+    echo -e "${YELLOW}Memulai verifikasi kontrak di Tea Sepolia Explorer untuk: $contract_address${RESET}"
 
-    # URL verifier dan URL API untuk Blockscout
-    VERIFIER_URL='https://explorer-tea-assam-fo46m5b966.t.conduit.xyz/api/'
-
-    # Verifikasi kontrak menggunakan forge
+    # Verifikasi kontrak menggunakan forge dengan Blockscout
     echo -e "${BLUE}Memverifikasi kontrak menggunakan forge...${RESET}"
     forge verify-contract \
         --rpc-url "$RPC_URL" \
@@ -111,7 +110,7 @@ verify_contract() {
 
     # Periksa hasil verifikasi
     if [[ $? -eq 0 ]]; then
-        echo -e "${GREEN}Kontrak berhasil diverifikasi di Blockscout!${RESET}"
+        echo -e "${GREEN}Kontrak berhasil diverifikasi di Tea Sepolia Explorer!${RESET}"
     else
         echo -e "${RED}Verifikasi kontrak gagal untuk alamat $contract_address.${RESET}"
     fi
@@ -162,7 +161,7 @@ EOL
         echo -e "${YELLOW}Kontrak $i berhasil di-deploy di alamat: $CONTRACT_ADDRESS${RESET}"
         echo -e "${WHITE}Lihat kontrak di: ${BLUE}$EXPLORER_URL/address/$CONTRACT_ADDRESS${RESET}"
 
-        # Verifikasi kontrak di Blockscout
+        # Verifikasi kontrak di Tea Sepolia Explorer
         verify_contract "$CONTRACT_ADDRESS"
     done
 }
