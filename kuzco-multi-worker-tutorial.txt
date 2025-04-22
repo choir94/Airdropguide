@@ -1,0 +1,203 @@
+Tutorial Menjalankan Beberapa Kuzco Worker dalam Satu VPS
+
+Tutorial ini memandu Anda untuk mengatur beberapa Kuzco Worker dalam satu VPS, dimulai dari mengkloning repositori untuk Worker 1, lalu menduplikasi konfigurasi untuk Worker 3 sebagai contoh. Nama folder dan port disesuaikan sebagai contoh, dan langkah-langkah dijelaskan secara rinci untuk memastikan keberhasilan.
+
+Prasyarat
+1. VPS dengan sistem operasi berbasis Linux (misalnya, Ubuntu 20.04 atau 22.04).
+2. Docker dan Docker Compose sudah terinstal (`docker` dan `docker-compose`).
+3. Git sudah terinstal (`sudo apt install git` jika belum ada).
+4. API key, Worker ID, dan Kode Worker untuk setiap worker (dari platform Kuzco).
+5. Port yang belum digunakan untuk setiap worker (misalnya, 14445 untuk Worker 1, 14446 untuk Worker 3).
+6. Akses root atau izin yang cukup di VPS.
+
+Langkah 1: Kloning Repositori untuk Worker 1
+1. Masuk ke direktori home:
+   cd ~
+
+2. Kloning repositori `vikey-inference`:
+   git clone https://github.com/direkturcrypto/vikey-inference
+   cd vikey-inference
+
+3. Konfigurasi file `.env` untuk Worker 1:
+   nano .env
+   Isi dengan API key dan port untuk Worker 1 (misalnya, port 14445):
+   VIKEY_API_KEY=isi_api_key_worker_1
+   NODE_PORT=14445
+   Simpan dengan Ctrl+O, Enter, lalu keluar dengan Ctrl+X.
+
+4. Jalankan ViKey Worker 1 di background:
+   chmod +x vikey-inference-linux
+   nohup ./vikey-inference-linux > vikey.log &
+   Cek log untuk memastikan berhasil:
+   tail -f vikey.log
+   Jika muncul pesan "Ollama server running on port 14445", Worker 1 berjalan dengan baik.
+
+5. Kloning repositori `kuzco-installer-docker`:
+   cd ~
+   git clone https://github.com/direkturcrypto/kuzco-installer-docker
+   cd kuzco-installer-docker/kuzco-main
+
+6. Konfigurasi `nginx.conf` untuk Worker 1:
+   nano nginx.conf
+   Pastikan port sesuai dengan Worker 1 (misalnya, 14445):
+   server {
+       listen 14445;
+       server_name _;
+       location / {
+           proxy_pass http://127.0.0.1:14445;
+           proxy_buffering off;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   Simpan dan keluar.
+
+7. Konfigurasi `docker-compose.yml` untuk Worker 1:
+   nano docker-compose.yml
+   Isi dengan Worker ID dan Kode Worker untuk Worker 1:
+   version: "3.8"
+   services:
+     kuzco-main:
+       container_name: kuzco-main
+       build: .
+       networks:
+         - kuzco-network
+       restart: always
+       environment:
+         NODE_ENV: "production"
+         KUZCO_WORKER: "ISI_WORKER_ID_WORKER_1"
+         KUZCO_CODE: "ISI_KODE_WORKER_1"
+         CACHE_DIRECTORY: "/app/cache"
+   networks:
+     kuzco-network:
+       driver: bridge
+   Simpan dan keluar.
+
+8. Jalankan Worker 1:
+   docker-compose up -d --build
+   Cek status kontainer:
+   docker ps
+   Pastikan kontainer `kuzco-main` berjalan. Cek log jika diperlukan:
+   docker logs kuzco-main
+
+Langkah 2: Duplikasi Folder untuk Worker 3
+1. Duplikasi folder `vikey-inference`:
+   cd ~
+   cp -r vikey-inference vikey-inference-3
+   cd vikey-inference-3
+
+2. Duplikasi folder `kuzco-main`:
+   cd ~/kuzco-installer-docker
+   cp -r kuzco-main kuzco-main-3
+   cd kuzco-main-3
+
+Langkah 3: Edit File `.env` untuk Worker 3
+1. Buka file `.env`:
+   cd ~/vikey-inference-3
+   nano .env
+
+2. Isi dengan API key dan port baru:
+   VIKEY_API_KEY=isi_api_key_worker_3
+   NODE_PORT=14446
+   Simpan dan keluar.
+   Catatan: Pastikan port 14446 tidak digunakan. Periksa dengan:
+   netstat -tuln | grep 14446
+
+Langkah 4: Jalankan ViKey Worker 3 di Background
+1. Beri izin eksekusi:
+   chmod +x vikey-inference-linux
+
+2. Jalankan di background:
+   nohup ./vikey-inference-linux > vikey.log &
+
+3. Cek log:
+   tail -f vikey.log
+   Jika muncul "Ollama server running on port 14446", Worker 3 berhasil.
+
+Langkah 5: Edit File `nginx.conf` untuk Worker 3
+1. Buka file `nginx.conf`:
+   cd ~/kuzco-installer-docker/kuzco-main-3
+   nano nginx.conf
+
+2. Sesuaikan port:
+   server {
+       listen 14446;
+       server_name _;
+       location / {
+           proxy_pass http://127.0.0.1:14446;
+           proxy_buffering off;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   Simpan dan keluar.
+
+Langkah 6: Edit File `docker-compose.yml` untuk Worker 3
+1. Buka file `docker-compose.yml`:
+   nano docker-compose.yml
+
+2. Sesuaikan konfigurasi:
+   version: "3.8"
+   services:
+     kuzco-main:
+       container_name: kuzco-main-3
+       build: .
+       networks:
+         - kuzco-network
+       restart: always
+       environment:
+         NODE_ENV: "production"
+         KUZCO_WORKER: "ISI_WORKER_ID_WORKER_3"
+         KUZCO_CODE: "ISI_KODE_WORKER_3"
+         CACHE_DIRECTORY: "/app/cache"
+   networks:
+     kuzco-network:
+       driver: bridge
+   Simpan dan keluar.
+
+Langkah 7: Jalankan Worker 3
+1. Bangun dan jalankan:
+   docker-compose up -d --build
+
+2. Cek status:
+   docker ps
+   Pastikan kontainer `kuzco-main-3` berjalan.
+
+3. Cek log:
+   docker logs kuzco-main-3
+
+Langkah 8: Verifikasi dan Pemecahan Masalah
+1. Cek log Worker ViKey:
+   - Worker 1: ~/vikey-inference/vikey.log
+   - Worker 3: ~/vikey-inference-3/vikey.log
+
+2. Cek log Worker Kuzco:
+   - Worker 1: docker logs kuzco-main
+   - Worker 3: docker logs kuzco-main-3
+
+3. Periksa konflik port:
+   netstat -tuln | grep 14445
+   netstat -tuln | grep 14446
+   Jika ada konflik, ubah port di `.env`, `nginx.conf`, dan `docker-compose.yml`.
+
+4. Izinkan port di firewall:
+   sudo ufw allow 14445
+   sudo ufw allow 14446
+
+5. Monitor sumber daya VPS:
+   Gunakan `htop` atau `top` untuk memastikan CPU, RAM, dan disk mencukupi.
+
+Tips Tambahan
+- Backup file konfigurasi: Salin file seperti `.env` atau `docker-compose.yml` sebelum mengedit (misalnya, `cp .env .env.bak`).
+- Port berurutan: Gunakan port seperti 14445, 14446, 14447 untuk worker tambahan.
+- Hentikan worker dengan aman:
+  - ViKey: `ps aux | grep vikey`, lalu `kill <PID>`.
+  - Docker: `docker-compose down` di folder worker.
+- Perbarui Worker ID dan Kode: Dapatkan dari dashboard Kuzco untuk setiap worker.
+
+Menambahkan Worker Lain
+Untuk Worker 4, ulangi langkah-langkah dari Langkah 2 dengan nama folder seperti `vikey-inference-4` dan `kuzco-main-4`, port baru (misalnya, 14447), serta API key, Worker ID, dan Kode Worker baru.
