@@ -122,13 +122,15 @@ function register_validator() {
 # Fungsi untuk menampilkan menu utama
 function main_menu() {
   clear
-  echo -e "${GREEN}=========== AZTEC SEQUENCER SETUP ===========${NC}"
-  echo -e "${YELLOW}1. Install Aztec (Full Setup)${NC}"
-  echo -e "${YELLOW}2. Cek Sinkronisasi${NC}"
-  echo -e "${YELLOW}3. Klaim Role Discord${NC}"
-  echo -e "${YELLOW}4. Register Validator${NC}"
-  echo -e "${RED}0. Keluar${NC}"
-  echo -e "${GREEN}=============================================${NC}"
+  echo -e "${GREEN}=========== AZTEC SEQUENCER SETUP BY AIRDROP NODE ===========${NC}"
+  echo -e "${WHITE}Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah proses setup dan integrasi node di jaringan Aztec.${NC}"
+  echo -e "${YELLOW}1. Install Aztec (Full Setup)${NC} - Install semua dependensi, tools, update Aztec, dan jalankan sequencer node."
+  echo -e "${YELLOW}2. Cek Sinkronisasi${NC} - Periksa status sinkronisasi node Aztec dengan menggunakan RPC."
+  echo -e "${YELLOW}3. Klaim Role Discord${NC} - Klaim role di Discord dengan memasukkan informasi validator."
+  echo -e "${YELLOW}4. Register Validator${NC} - Daftarkan validator baru di jaringan Aztec."
+  echo -e "${RED}0. Keluar${NC} - Keluar dari menu dan menghentikan skrip."
+
+  echo -e "${GREEN}===========================================================${NC}"
 
   read -p "$(echo -e ${CYAN}Pilih opsi:${NC} )" choice
   case $choice in
