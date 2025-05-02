@@ -1,33 +1,13 @@
 #!/bin/bash
 
 # Warna
-NC='\033[0m'
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-
-# Fungsi validasi baru
-function validate_hex() {
-  local input=$1
-  local name=$2
-  local length=$3
-  if [[ ! $input =~ ^0x[0-9a-fA-F]{$length}$ ]]; then
-    echo -e "${RED}Error: $name tidak valid. Harus berupa heksadesimal dengan panjang $length karakter (termasuk 0x).${NC}"
-    exit 1
-  fi
-}
-
-function validate_url() {
-  local input=$1
-  local name=$2
-  if [[ ! $input =~ ^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$ ]]; then
-    echo -e "${RED}Error: $name tidak valid. Harus berupa URL yang valid (misalnya, https://sepolia.infura.io/v3/...).${NC}"
-    exit 1
-  fi
-}
+NC='\033[0m'       # No Color
+RED='\033[0;31m'    # Red
+GREEN='\033[0;32m'  # Green
+YELLOW='\033[0;33m' # Yellow
+BLUE='\033[0;34m'   # Blue
+CYAN='\033[0;36m'   # Cyan
+WHITE='\033[1;37m'  # White
 
 # Fungsi untuk memperbarui daftar paket APT sekali saja
 function update_apt() {
@@ -39,6 +19,17 @@ function update_apt() {
       exit 1
     fi
     touch /tmp/apt_updated
+  fi
+}
+
+# Fungsi untuk memeriksa apakah Docker sudah terinstall
+function check_docker() {
+  echo -e "${BLUE}Cek apakah Docker sudah terinstall...${NC}"
+  if ! command -v docker &> /dev/null; then
+    echo -e "${RED}Docker tidak ditemukan, menginstall Docker...${NC}"
+    install_docker
+  else
+    echo -e "${GREEN}Docker sudah terinstall.${NC}"
   fi
 }
 
@@ -88,25 +79,33 @@ function install_docker() {
   }
 }
 
+# Fungsi untuk menginstall Aztec tools
+function install_aztec_tools() {
+  echo -e "${CYAN}Menginstall Aztec tools...${NC}"
+  bash -i <(curl -s https://install.aztec.network)
+}
+
+# Fungsi untuk update Aztec
+function update_aztec() {
+  echo -e "${CYAN}Mengupdate Aztec ke alpha-testnet...${NC}"
+  aztec-up alpha-testnet
+}
+
 # Fungsi untuk menjalankan Sequencer Node
 function start_sequencer_node() {
   echo -e "${GREEN}Menjalankan Sequencer Node...${NC}"
   echo -e "${BLUE}Panduan: RPC URL adalah endpoint L1, misalnya https://sepolia.infura.io/v3/YOUR_API_KEY${NC}"
   read -p "$(echo -e ${CYAN}Masukkan RPC URL:${NC} )" RPC_URL
-  validate_url "$RPC_URL" "RPC URL"
   
   echo -e "${BLUE}Panduan: Beacon URL adalah endpoint untuk konsensus, misalnya http://beacon.aztec.network${NC}"
   read -p "$(echo -e ${CYAN}Masukkan BEACON URL:${NC} )" BEACON_URL
-  validate_url "$BEACON_URL" "Beacon URL"
   
   echo -e "${BLUE}Panduan: Private Key adalah kunci heksadesimal 64 karakter dengan prefix 0x${NC}"
   read -s -p "$(echo -e ${CYAN}Masukkan Private Key (0xYourPrivateKey):${NC} )" PRIVATE_KEY
   echo
-  validate_hex "$PRIVATE_KEY" "Private Key" 64
   
   echo -e "${BLUE}Panduan: Public Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x${NC}"
   read -p "$(echo -e ${CYAN}Masukkan Public Address (0xYourAddress):${NC} )" PUBLIC_ADDRESS
-  validate_hex "$PUBLIC_ADDRESS" "Public Address" 40
   
   echo -e "${BLUE}Panduan: Masukkan IP publik server Anda${NC}"
   read -p "$(echo -e ${CYAN}Masukkan IP Server:${NC} )" IP
@@ -121,21 +120,41 @@ function start_sequencer_node() {
     --p2p.p2pIp "$IP"
 }
 
+# Fungsi untuk memeriksa sinkronisasi node
+function check_sync() {
+  echo -e "${YELLOW}Cek sinkronisasi node...${NC}"
+  curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
+  http://localhost:8080 | jq -r ".result.proven.number"
+}
+
+# Fungsi untuk klaim role di Discord
+function claim_role() {
+  echo -e "${GREEN}Mengklaim role di Discord...${NC}"
+  echo -e "${BLUE}Panduan: Validator Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x${NC}"
+  read -p "$(echo -e ${CYAN}Masukkan validator address:${NC} )" VALIDATOR_ADDRESS
+  echo -e "${BLUE}Panduan: Block Number adalah nomor blok L2 dari cek sinkronisasi${NC}"
+  read -p "$(echo -e ${CYAN}Masukkan block number:${NC} )" BLOCK_NUMBER
+  echo -e "${BLUE}Panduan: Sync Proof adalah bukti sinkronisasi dari node Anda${NC}"
+  read -p "$(echo -e ${CYAN}Masukkan sync proof:${NC} )" SYNC_PROOF
+
+  curl -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"operator_start","params":["'$VALIDATOR_ADDRESS'", "'$BLOCK_NUMBER'", "'$SYNC_PROOF'"],"id":67}' \
+  http://localhost:8080
+}
+
 # Fungsi untuk register validator
 function register_validator() {
   echo -e "${YELLOW}Mendaftarkan validator...${NC}"
   echo -e "${BLUE}Panduan: RPC URL adalah endpoint L1, misalnya https://sepolia.infura.io/v3/YOUR_API_KEY${NC}"
   read -p "$(echo -e ${CYAN}Masukkan RPC URL:${NC} )" RPC_URL
-  validate_url "$RPC_URL" "RPC URL"
   
   echo -e "${BLUE}Panduan: Validator Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x${NC}"
   read -p "$(echo -e ${CYAN}Masukkan Validator Address:${NC} )" VALIDATOR_ADDRESS
-  validate_hex "$VALIDATOR_ADDRESS" "Validator Address" 40
   
   echo -e "${BLUE}Panduan: Private Key adalah kunci heksadesimal 64 karakter dengan prefix 0x${NC}"
   read -s -p "$(echo -e ${CYAN}Masukkan Private Key:${NC} )" PRIVATE_KEY
   echo
-  validate_hex "$PRIVATE_KEY" "Private Key" 64
 
   aztec add-l1-validator \
     --l1-rpc-urls "$RPC_URL" \
@@ -151,7 +170,7 @@ function main_menu() {
   while true; do
     clear
     echo -e "${GREEN}=========== AZTEC SEQUENCER SETUP BY AIRDROP NODE ===========${NC}"
-    echo -e "${WHITE}Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec.${NC}"
+    echo -e "${WHITE Spoken}Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec.${NC}"
     echo -e "${BLUE}Dokumentasi resmi: https://docs.aztec.network${NC}"
     echo -e "${YELLOW}1. Install Aztec (Full Setup)${NC} - Install dependensi, tools, update, dan jalankan sequencer."
     echo -e "${YELLOW}2. Cek Sinkronisasi${NC} - Periksa status sinkronisasi node dengan RPC."
