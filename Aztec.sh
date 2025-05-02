@@ -170,7 +170,7 @@ function main_menu() {
   while true; do
     clear
     echo -e "${GREEN}=========== AZTEC SEQUENCER SETUP BY AIRDROP NODE ===========${NC}"
-    echo -e "${WHITE Spoken}Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec.${NC}"
+    echo -e "${WHITE}Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec.${NC}"
     echo -e "${BLUE}Dokumentasi resmi: https://docs.aztec.network${NC}"
     echo -e "${YELLOW}1. Install Aztec (Full Setup)${NC} - Install dependensi, tools, update, dan jalankan sequencer."
     echo -e "${YELLOW}2. Cek Sinkronisasi${NC} - Periksa status sinkronisasi node dengan RPC."
