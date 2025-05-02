@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Kode Warna
+RESET="\033[0m"
+BOLD="\033[1m"
+BLACK="\033[0;30m"
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+MAGENTA="\033[0;35m"
+CYAN="\033[0;36m"
+WHITE="\033[0;37m"
+LIGHT_GREEN="\033[1;32m"
+LIGHT_CYAN="\033[1;36m"
+LIGHT_YELLOW="\033[1;33m"
+
 # Fungsi untuk update apt
 function update_apt() {
   sudo apt-get update -y
@@ -7,7 +22,7 @@ function update_apt() {
 
 # Fungsi untuk menginstall Docker jika belum ada
 function install_docker() {
-  echo "Menginstall Docker..."
+  echo -e "${CYAN}Menginstall Docker...${RESET}"
   update_apt
   sudo apt-get upgrade -y
   for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
@@ -17,7 +32,7 @@ function install_docker() {
   sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg || {
-    echo "Gagal mengunduh kunci GPG Docker."
+    echo -e "${RED}Gagal mengunduh kunci GPG Docker.${RESET}"
     exit 1
   }
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -28,18 +43,19 @@ function install_docker() {
   sudo apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo systemctl enable docker
   sudo systemctl restart docker
+  echo -e "${LIGHT_GREEN}Docker berhasil diinstall.${RESET}"
 }
 
 # Fungsi untuk install Aztec Node
 function install_aztec_node() {
   # Install Dependencies
-  echo "Menginstall dependensi tambahan..."
+  echo -e "${CYAN}Menginstall dependensi tambahan...${RESET}"
   update_apt
   sudo apt-get install -y curl screen net-tools psmisc jq
 
   # Cek dan bersihkan direktori lama jika ada
   if [ -d "$HOME/.aztec/alpha-testnet" ]; then
-    echo "Menghapus direktori lama ~/.aztec/alpha-testnet..."
+    echo -e "${YELLOW}Menghapus direktori lama ~/.aztec/alpha-testnet...${RESET}"
     rm -rf "$HOME/.aztec/alpha-testnet"
   fi
 
@@ -79,10 +95,10 @@ EOF
   chmod +x ~/start_aztec_node.sh
 
   # Jalankan dalam screen
-  echo "Menjalankan Aztec Node dalam screen session 'aztec'..."
+  echo -e "${LIGHT_GREEN}Menjalankan Aztec Node dalam screen session 'aztec'...${RESET}"
   screen -dmS aztec bash -c "~/start_aztec_node.sh"
 
-  echo "Selesai! Gunakan 'screen -r aztec' untuk melihat log node."
+  echo -e "${GREEN}Selesai! Gunakan 'screen -r aztec' untuk melihat log node.${RESET}"
 
   # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
@@ -91,7 +107,7 @@ EOF
 
 # Fungsi untuk mengecek block number setelah sinkronisasi
 function check_block_number() {
-  echo "Memeriksa block number setelah sinkronisasi..."
+  echo -e "${CYAN}Memeriksa block number setelah sinkronisasi...${RESET}"
   curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' http://localhost:8080 | jq -r '.result.proven.number'
 
   # Menunggu input dari pengguna untuk kembali ke menu utama
@@ -129,7 +145,7 @@ function add_validator() {
 
 # Fungsi untuk masuk ke screen dan cek log
 function check_logs() {
-  echo "Masuk ke screen untuk melihat log..."
+  echo -e "${CYAN}Masuk ke screen untuk melihat log...${RESET}"
   screen -r aztec
 
   # Menunggu input dari pengguna untuk kembali ke menu utama
@@ -141,9 +157,9 @@ function check_logs() {
 function main_menu() {
   clear
   # Menambahkan warna di header menu
-  echo -e "\033[1;36m===============================\033[0m"
-  echo -e "\033[1;32m  Script by Airdrop Node\033[0m"
-  echo -e "\033[1;36m===============================\033[0m"
+  echo -e "${LIGHT_CYAN}===============================${RESET}"
+  echo -e "${BOLD}${LIGHT_GREEN}  Script by Airdrop Node${RESET}"
+  echo -e "${LIGHT_CYAN}===============================${RESET}"
   PS3="Pilih menu: "
   options=("Install Aztec Node" "Cek Block Number" "Cek Archive Sibling Path" "Tambah Validator" "Masuk ke Screen untuk Cek Logs" "Keluar")
   select opt in "${options[@]}"
@@ -171,11 +187,11 @@ function main_menu() {
               break
               ;;
           "Keluar")
-              echo "Keluar dari program."
+              echo -e "${RED}Keluar dari program.${RESET}"
               break
               ;;
           *)
-              echo "Pilihan tidak valid!"
+              echo -e "${RED}Pilihan tidak valid!${RESET}"
               ;;
       esac
   done
