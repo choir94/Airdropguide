@@ -48,37 +48,30 @@ function install_docker() {
 
 # Fungsi untuk install Aztec Node
 function install_aztec_node() {
-  # Install Dependencies
   echo -e "${CYAN}Menginstall dependensi tambahan...${RESET}"
   update_apt
   sudo apt-get install -y curl screen net-tools psmisc jq
 
-  # Cek dan bersihkan direktori lama jika ada
   if [ -d "$HOME/.aztec/alpha-testnet" ]; then
     echo -e "${YELLOW}Menghapus direktori lama ~/.aztec/alpha-testnet...${RESET}"
     rm -rf "$HOME/.aztec/alpha-testnet"
   fi
 
-  # Buat direktori dan install CLI
   mkdir -p ~/.aztec/bin
   curl -fsSL https://install.aztec.network | bash
   echo 'export PATH=$PATH:$HOME/.aztec/bin' >> ~/.bashrc
   source ~/.bashrc
   export PATH="$PATH:$HOME/.aztec/bin"
 
-  # Update ke alpha-testnet
   aztec-up alpha-testnet
 
-  # Ambil IP VPS
   IP=$(curl -s https://api.ipify.org)
 
-  # Input konfigurasi pengguna
   read -p "Enter Sepolia Ethereum RPC URL: " L1_RPC_URL
   read -p "Enter Sepolia BEACON URL: " L1_CONSENSUS_URL
   read -p "Enter Private Key (0x...): " VALIDATOR_PRIVATE_KEY
   read -p "Enter Wallet Address (0x...): " COINBASE_ADDRESS
 
-  # Buat script untuk menjalankan node
   cat <<EOF > ~/start_aztec_node.sh
 #!/bin/bash
 export PATH=\$PATH:\$HOME/.aztec/bin
@@ -89,43 +82,34 @@ aztec start --node --archiver --sequencer \\
   --l1-consensus-host-urls $L1_CONSENSUS_URL \\
   --sequencer.validatorPrivateKey $VALIDATOR_PRIVATE_KEY \\
   --sequencer.coinbase $COINBASE_ADDRESS \\
-  --p2p.p2pIp $IP
+  --p2p.p2pIp $IP \\
+  --p2p.maxTxPoolSize 10000
 EOF
 
   chmod +x ~/start_aztec_node.sh
 
-  # Jalankan dalam screen
   echo -e "${LIGHT_GREEN}Menjalankan Aztec Node dalam screen session 'aztec'...${RESET}"
   screen -dmS aztec bash -c "~/start_aztec_node.sh"
 
   echo -e "${GREEN}Selesai! Gunakan 'screen -r aztec' untuk melihat log node.${RESET}"
-
-  # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
   main_menu
 }
 
-# Fungsi untuk mengecek block number setelah sinkronisasi
 function check_block_number() {
   echo -e "${CYAN}Memeriksa block number setelah sinkronisasi...${RESET}"
   curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' http://localhost:8080 | jq -r '.result.proven.number'
-
-  # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
   main_menu
 }
 
-# Fungsi untuk mengecek archive sibling path
 function check_archive_sibling_path() {
   read -p "Masukkan block number: " block_number
   curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getArchiveSiblingPath","params":["'"$block_number"'","'"$block_number"'"],"id":67}' http://localhost:8080 | jq -r ".result"
-
-  # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
   main_menu
 }
 
-# Fungsi untuk menambahkan validator
 function add_validator() {
   read -p "Masukkan RPC URL Sepolia: " SEPOLIA_RPC_URL
   read -p "Masukkan Private Key Anda (0x...): " PRIVATE_KEY
@@ -137,26 +121,19 @@ function add_validator() {
     --proposer-eoa "$VALIDATOR_ADDRESS" \
     --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \
     --l1-chain-id 11155111
-
-  # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
   main_menu
 }
 
-# Fungsi untuk masuk ke screen dan cek log
 function check_logs() {
   echo -e "${CYAN}Masuk ke screen untuk melihat log...${RESET}"
   screen -r aztec
-
-  # Menunggu input dari pengguna untuk kembali ke menu utama
   read -p "Tekan Enter untuk kembali ke menu utama..."
   main_menu
 }
 
-# Fungsi utama untuk menampilkan menu
 function main_menu() {
   clear
-  # Menambahkan warna di header menu
   echo -e "${LIGHT_CYAN}===============================${RESET}"
   echo -e "${BOLD}${LIGHT_GREEN}  Script by Airdrop Node${RESET}"
   echo -e "${LIGHT_CYAN}===============================${RESET}"
@@ -197,5 +174,4 @@ function main_menu() {
   done
 }
 
-# Jalankan menu utama
 main_menu
