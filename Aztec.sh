@@ -140,9 +140,10 @@ function check_logs() {
 # Fungsi utama untuk menampilkan menu
 function main_menu() {
   clear
-  echo "==============================="
-  echo "  Script by Airdrop Node"
-  echo "==============================="
+  # Menambahkan warna di header menu
+  echo -e "\033[1;36m===============================\033[0m"
+  echo -e "\033[1;32m  Script by Airdrop Node\033[0m"
+  echo -e "\033[1;36m===============================\033[0m"
   PS3="Pilih menu: "
   options=("Install Aztec Node" "Cek Block Number" "Cek Archive Sibling Path" "Tambah Validator" "Masuk ke Screen untuk Cek Logs" "Keluar")
   select opt in "${options[@]}"
