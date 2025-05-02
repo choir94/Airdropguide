@@ -1,42 +1,8 @@
 #!/bin/bash
 
-# Fungsi untuk memperbarui daftar paket APT sekali saja
+# Fungsi untuk update apt
 function update_apt() {
-  if [[ ! -f /tmp/apt_updated ]]; then
-    echo "Memperbarui daftar paket..."
-    sudo apt-get update
-    if [[ $? -ne 0 ]]; then
-      echo "Gagal memperbarui daftar paket APT."
-      exit 1
-    fi
-    touch /tmp/apt_updated
-  fi
-}
-
-# Fungsi untuk memeriksa apakah Docker sudah terinstall
-function check_docker() {
-  echo "Cek apakah Docker sudah terinstall..."
-  if ! command -v docker &> /dev/null; then
-    echo "Docker tidak ditemukan, menginstall Docker..."
-    install_docker
-  else
-    echo "Docker sudah terinstall."
-  fi
-}
-
-# Fungsi untuk menginstall dependensi yang diperlukan
-function install_dependencies() {
-  echo "Menginstall dependensi..."
-  update_apt
-  sudo apt-get upgrade -y
-  sudo apt-get install -y --no-install-recommends \
-    curl iptables build-essential git wget lz4 jq make gcc nano \
-    automake autoconf tmux htop nvme-cli libgbm1 pkg-config \
-    libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
-  if [[ $? -ne 0 ]]; then
-    echo "Gagal menginstall dependensi."
-    exit 1
-  fi
+  sudo apt-get update -y
 }
 
 # Fungsi untuk menginstall Docker jika belum ada
@@ -62,194 +28,157 @@ function install_docker() {
   sudo apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo systemctl enable docker
   sudo systemctl restart docker
-
-  # Test Docker
-  sudo docker run hello-world || {
-    echo "Gagal menjalankan tes Docker."
-    exit 1
-  }
 }
 
-# Fungsi untuk menginstall Aztec tools
-function install_aztec_tools() {
-  echo "Menginstall Aztec tools..."
-  bash -i <(curl -s https://install.aztec.network)
-}
+# Fungsi untuk install Aztec Node
+function install_aztec_node() {
+  # Install Dependencies
+  echo "Menginstall dependensi tambahan..."
+  update_apt
+  sudo apt-get install -y curl screen net-tools psmisc jq
 
-# Fungsi untuk update Aztec
-function update_aztec() {
-  echo "Mengupdate Aztec ke alpha-testnet..."
+  # Cek dan bersihkan direktori lama jika ada
+  if [ -d "$HOME/.aztec/alpha-testnet" ]; then
+    echo "Menghapus direktori lama ~/.aztec/alpha-testnet..."
+    rm -rf "$HOME/.aztec/alpha-testnet"
+  fi
+
+  # Buat direktori dan install CLI
+  mkdir -p ~/.aztec/bin
+  curl -fsSL https://install.aztec.network | bash
+  echo 'export PATH=$PATH:$HOME/.aztec/bin' >> ~/.bashrc
+  source ~/.bashrc
+  export PATH="$PATH:$HOME/.aztec/bin"
+
+  # Update ke alpha-testnet
   aztec-up alpha-testnet
+
+  # Ambil IP VPS
+  IP=$(curl -s https://api.ipify.org)
+
+  # Input konfigurasi pengguna
+  read -p "Enter Sepolia Ethereum RPC URL: " L1_RPC_URL
+  read -p "Enter Sepolia BEACON URL: " L1_CONSENSUS_URL
+  read -p "Enter Private Key (0x...): " VALIDATOR_PRIVATE_KEY
+  read -p "Enter Wallet Address (0x...): " COINBASE_ADDRESS
+
+  # Buat script untuk menjalankan node
+  cat <<EOF > ~/start_aztec_node.sh
+#!/bin/bash
+export PATH=\$PATH:\$HOME/.aztec/bin
+aztec start --node --archiver --sequencer \\
+  --network alpha-testnet \\
+  --port 8080 \\
+  --l1-rpc-urls $L1_RPC_URL \\
+  --l1-consensus-host-urls $L1_CONSENSUS_URL \\
+  --sequencer.validatorPrivateKey $VALIDATOR_PRIVATE_KEY \\
+  --sequencer.coinbase $COINBASE_ADDRESS \\
+  --p2p.p2pIp $IP
+EOF
+
+  chmod +x ~/start_aztec_node.sh
+
+  # Jalankan dalam screen
+  echo "Menjalankan Aztec Node dalam screen session 'aztec'..."
+  screen -dmS aztec bash -c "~/start_aztec_node.sh"
+
+  echo "Selesai! Gunakan 'screen -r aztec' untuk melihat log node."
+
+  # Menunggu input dari pengguna untuk kembali ke menu utama
+  read -p "Tekan Enter untuk kembali ke menu utama..."
+  main_menu
 }
 
-# Fungsi untuk menjalankan Sequencer Node
-function start_sequencer_node() {
-  echo "Menjalankan Sequencer Node..."
-  echo "Panduan: RPC URL adalah endpoint L1, misalnya https://sepolia.infura.io/v3/YOUR_API_KEY"
-  read -p "Masukkan RPC URL: " RPC_URL
-  
-  echo "Panduan: Beacon URL adalah endpoint untuk konsensus, misalnya http://beacon.aztec.network"
-  read -p "Masukkan BEACON URL: " BEACON_URL
-  
-  echo "Panduan: Private Key adalah kunci heksadesimal 64 karakter dengan prefix 0x"
-  read -s -p "Masukkan Private Key (0xYourPrivateKey): " PRIVATE_KEY
-  echo
-  
-  echo "Panduan: Public Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x"
-  read -p "Masukkan Public Address (0xYourAddress): " PUBLIC_ADDRESS
-  
-  echo "Panduan: Masukkan IP publik server Anda"
-  read -p "Masukkan IP Server: " IP
+# Fungsi untuk mengecek block number setelah sinkronisasi
+function check_block_number() {
+  echo "Memeriksa block number setelah sinkronisasi..."
+  curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' http://localhost:8080 | jq -r '.result.proven.number'
 
-  # Periksa apakah sesi screen 'aztec' sudah ada
-  if screen -list | grep -q "aztec"; then
-    echo "Sesi screen 'aztec' sudah ada."
-    echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau hentikan sesi lama dengan 'screen -X -S aztec quit'."
-    read -p "Hentikan sesi lama dan buat baru? [y/N]: " confirm
-    if [[ $confirm =~ ^[Yy]$ ]]; then
-      screen -X -S aztec quit
-      echo "Sesi lama dihentikan."
-    else
-      echo "Dibatalkan. Silakan kelola sesi screen secara manual."
-      return 1
-    fi
-  fi
-
-  # Buat sesi screen baru di latar belakang
-  echo "Membuat sesi screen baru bernama 'aztec' di latar belakang..."
-  echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau pilih opsi 'Cek Sesi Screen' di menu utama."
-  screen -S aztec -d -m bash -c "aztec start --node --archiver --sequencer \
-    --network alpha-testnet \
-    --l1-rpc-urls \"$RPC_URL\" \
-    --l1-consensus-host-urls \"$BEACON_URL\" \
-    --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" \
-    --sequencer.coinbase \"$PUBLIC_ADDRESS\" \
-    --p2p.p2pIp \"$IP\"; exec bash"
-  sleep 2
-  if screen -list | grep -q "aztec"; then
-    echo "Sesi screen 'aztec' berhasil dibuat dan node berjalan di latar belakang."
-    echo "Kembali ke menu utama..."
-  else
-    echo "Gagal membuat sesi screen 'aztec'. Silakan periksa log atau coba lagi."
-    return 1
-  fi
+  # Menunggu input dari pengguna untuk kembali ke menu utama
+  read -p "Tekan Enter untuk kembali ke menu utama..."
+  main_menu
 }
 
-# Fungsi untuk memeriksa sesi screen
-function check_screen() {
-  echo "Memeriksa sesi screen 'aztec'..."
-  if screen -list | grep -q "aztec"; then
-    echo "Sesi screen 'aztec' sedang berjalan."
-    echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau 'screen -X -S aztec quit' untuk menghentikan."
-    read -p "Apakah Anda ingin menghentikan sesi screen 'aztec'? [y/N]: " confirm
-    if [[ $confirm =~ ^[Yy]$ ]]; then
-      screen -X -S aztec quit
-      echo "Sesi screen 'aztec' telah dihentikan."
-    else
-      echo "Sesi screen tetap berjalan."
-    fi
-  else
-    echo "Tidak ada sesi screen 'aztec' yang berjalan."
-    echo "Panduan: Jalankan opsi 'Install Aztec (Full Setup)' untuk memulai node."
-  fi
+# Fungsi untuk mengecek archive sibling path
+function check_archive_sibling_path() {
+  read -p "Masukkan block number: " block_number
+  curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getArchiveSiblingPath","params":["'"$block_number"'","'"$block_number"'"],"id":67}' http://localhost:8080 | jq -r ".result"
+
+  # Menunggu input dari pengguna untuk kembali ke menu utama
+  read -p "Tekan Enter untuk kembali ke menu utama..."
+  main_menu
 }
 
-# Fungsi untuk memeriksa sinkronisasi node
-function check_sync() {
-  echo "Cek sinkronisasi node..."
-  curl -s -X POST -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
-  http://localhost:8080 | jq -r ".result.proven.number"
-}
-
-# Fungsi untuk klaim role di Discord
-function claim_role() {
-  echo "Mengklaim role di Discord..."
-  echo "Panduan: Validator Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x"
-  read -p "Masukkan validator address: " VALIDATOR_ADDRESS
-  echo "Panduan: Block Number adalah nomor blok L2 dari cek sinkronisasi"
-  read -p "Masukkan block number: " BLOCK_NUMBER
-  echo "Panduan: Sync Proof adalah bukti sinkronisasi dari node Anda"
-  read -p "Masukkan sync proof: " SYNC_PROOF
-
-  curl -X POST -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"operator_start","params":["'$VALIDATOR_ADDRESS'", "'$BLOCK_NUMBER'", "'$SYNC_PROOF'"],"id":67}' \
-  http://localhost:8080
-}
-
-# Fungsi untuk register validator
-function register_validator() {
-  echo "Mendaftarkan validator..."
-  echo "Panduan: RPC URL adalah endpoint L1, misalnya https://sepolia.infura.io/v3/YOUR_API_KEY"
-  read -p "Masukkan RPC URL: " RPC_URL
-  
-  echo "Panduan: Validator Address adalah alamat Ethereum Anda, 42 karakter dengan prefix 0x"
-  read -p "Masukkan Validator Address: " VALIDATOR_ADDRESS
-  
-  echo "Panduan: Private Key adalah kunci heksadesimal 64 karakter dengan prefix 0x"
-  read -s -p "Masukkan Private Key: " PRIVATE_KEY
-  echo
-
+# Fungsi untuk menambahkan validator
+function add_validator() {
+  read -p "Masukkan RPC URL Sepolia: " SEPOLIA_RPC_URL
+  read -p "Masukkan Private Key Anda (0x...): " PRIVATE_KEY
+  read -p "Masukkan Alamat Attester (Validator Address): " VALIDATOR_ADDRESS
   aztec add-l1-validator \
-    --l1-rpc-urls "$RPC_URL" \
+    --l1-rpc-urls "$SEPOLIA_RPC_URL" \
     --private-key "$PRIVATE_KEY" \
     --attester "$VALIDATOR_ADDRESS" \
     --proposer-eoa "$VALIDATOR_ADDRESS" \
     --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \
     --l1-chain-id 11155111
+
+  # Menunggu input dari pengguna untuk kembali ke menu utama
+  read -p "Tekan Enter untuk kembali ke menu utama..."
+  main_menu
 }
 
-# Fungsi untuk menampilkan menu utama
+# Fungsi untuk masuk ke screen dan cek log
+function check_logs() {
+  echo "Masuk ke screen untuk melihat log..."
+  screen -r aztec
+
+  # Menunggu input dari pengguna untuk kembali ke menu utama
+  read -p "Tekan Enter untuk kembali ke menu utama..."
+  main_menu
+}
+
+# Fungsi utama untuk menampilkan menu
 function main_menu() {
-  while true; do
-    clear
-    echo "=========== AZTEC SEQUENCER SETUP BY AIRDROP NODE ==========="
-    echo "Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec."
-    echo "Dokumentasi resmi: https://docs.aztec.network"
-    echo "1. Install Aztec (Full Setup) - Install dependensi, tools, update, dan jalankan sequencer."
-    echo "2. Cek Sinkronisasi - Periksa status sinkronisasi node dengan RPC."
-    echo "3. Klaim Role Discord - Klaim role di Discord untuk validator."
-    echo "4. Register Validator - Daftarkan validator baru di jaringan Aztec."
-    echo "5. Cek Sesi Screen - Periksa status sesi screen 'aztec'."
-    echo "0. Keluar - Hentikan skrip."
-    echo "==========================================================="
-    read -p "Pilih opsi [0-5]: " choice
-    case $choice in
-      1) 
-        install_dependencies
-        check_docker
-        install_aztec_tools
-        update_aztec
-        start_sequencer_node
-        read -p "Tekan Enter untuk kembali ke menu..."
-        ;;
-      2) 
-        check_sync
-        read -p "Tekan Enter untuk kembali ke menu..."
-        ;;
-      3) 
-        claim_role
-        read -p "Tekan Enter untuk kembali ke menu..."
-        ;;
-      4) 
-        register_validator
-        read -p "Tekan Enter untuk kembali ke menu..."
-        ;;
-      5) 
-        check_screen
-        read -p "Tekan Enter untuk kembali ke menu..."
-        ;;
-      0) 
-        echo "Keluar dari skrip. Terima kasih!"
-        exit 0
-        ;;
-      *) 
-        echo "Pilihan tidak valid. Silakan pilih 0-5."
-        sleep 2
-        ;;
-    esac
+  clear
+  echo "==============================="
+  echo "  Script by Airdrop Node"
+  echo "==============================="
+  PS3="Pilih menu: "
+  options=("Install Aztec Node" "Cek Block Number" "Cek Archive Sibling Path" "Tambah Validator" "Masuk ke Screen untuk Cek Logs" "Keluar")
+  select opt in "${options[@]}"
+  do
+      case $opt in
+          "Install Aztec Node")
+              install_docker
+              install_aztec_node
+              break
+              ;;
+          "Cek Block Number")
+              check_block_number
+              break
+              ;;
+          "Cek Archive Sibling Path")
+              check_archive_sibling_path
+              break
+              ;;
+          "Tambah Validator")
+              add_validator
+              break
+              ;;
+          "Masuk ke Screen untuk Cek Logs")
+              check_logs
+              break
+              ;;
+          "Keluar")
+              echo "Keluar dari program."
+              break
+              ;;
+          *)
+              echo "Pilihan tidak valid!"
+              ;;
+      esac
   done
 }
 
-# Menjalankan menu utama
+# Jalankan menu utama
 main_menu
