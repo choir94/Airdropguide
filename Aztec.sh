@@ -101,14 +101,57 @@ function start_sequencer_node() {
   echo "Panduan: Masukkan IP publik server Anda"
   read -p "Masukkan IP Server: " IP
 
-  screen -S aztec
-  aztec start --node --archiver --sequencer \
+  # Periksa apakah sesi screen 'aztec' sudah ada
+  if screen -list | grep -q "aztec"; then
+    echo "Sesi screen 'aztec' sudah ada."
+    echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau hentikan sesi lama dengan 'screen -X -S aztec quit'."
+    read -p "Hentikan sesi lama dan buat baru? [y/N]: " confirm
+    if [[ $confirm =~ ^[Yy]$ ]]; then
+      screen -X -S aztec quit
+      echo "Sesi lama dihentikan."
+    else
+      echo "Dibatalkan. Silakan kelola sesi screen secara manual."
+      return 1
+    fi
+  fi
+
+  # Buat sesi screen baru di latar belakang
+  echo "Membuat sesi screen baru bernama 'aztec' di latar belakang..."
+  echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau pilih opsi 'Cek Sesi Screen' di menu utama."
+  screen -S aztec -d -m bash -c "aztec start --node --archiver --sequencer \
     --network alpha-testnet \
-    --l1-rpc-urls "$RPC_URL" \
-    --l1-consensus-host-urls "$BEACON_URL" \
-    --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-    --sequencer.coinbase "$PUBLIC_ADDRESS" \
-    --p2p.p2pIp "$IP"
+    --l1-rpc-urls \"$RPC_URL\" \
+    --l1-consensus-host-urls \"$BEACON_URL\" \
+    --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" \
+    --sequencer.coinbase \"$PUBLIC_ADDRESS\" \
+    --p2p.p2pIp \"$IP\"; exec bash"
+  sleep 2
+  if screen -list | grep -q "aztec"; then
+    echo "Sesi screen 'aztec' berhasil dibuat dan node berjalan di latar belakang."
+    echo "Kembali ke menu utama..."
+  else
+    echo "Gagal membuat sesi screen 'aztec'. Silakan periksa log atau coba lagi."
+    return 1
+  fi
+}
+
+# Fungsi untuk memeriksa sesi screen
+function check_screen() {
+  echo "Memeriksa sesi screen 'aztec'..."
+  if screen -list | grep -q "aztec"; then
+    echo "Sesi screen 'aztec' sedang berjalan."
+    echo "Panduan: Gunakan 'screen -r aztec' untuk melihat sesi, atau 'screen -X -S aztec quit' untuk menghentikan."
+    read -p "Apakah Anda ingin menghentikan sesi screen 'aztec'? [y/N]: " confirm
+    if [[ $confirm =~ ^[Yy]$ ]]; then
+      screen -X -S aztec quit
+      echo "Sesi screen 'aztec' telah dihentikan."
+    else
+      echo "Sesi screen tetap berjalan."
+    fi
+  else
+    echo "Tidak ada sesi screen 'aztec' yang berjalan."
+    echo "Panduan: Jalankan opsi 'Install Aztec (Full Setup)' untuk memulai node."
+  fi
 }
 
 # Fungsi untuk memeriksa sinkronisasi node
@@ -161,13 +204,16 @@ function main_menu() {
   while true; do
     clear
     echo "=========== AZTEC SEQUENCER SETUP BY AIRDROP NODE ==========="
+    echo "Skrip ini dibuat oleh t.me/airdrop_node untuk mempermudah setup node Aztec."
+    echo "Dokumentasi resmi: https://docs.aztec.network"
     echo "1. Install Aztec (Full Setup) - Install dependensi, tools, update, dan jalankan sequencer."
     echo "2. Cek Sinkronisasi - Periksa status sinkronisasi node dengan RPC."
     echo "3. Klaim Role Discord - Klaim role di Discord untuk validator."
     echo "4. Register Validator - Daftarkan validator baru di jaringan Aztec."
+    echo "5. Cek Sesi Screen - Periksa status sesi screen 'aztec'."
     echo "0. Keluar - Hentikan skrip."
     echo "==========================================================="
-    read -p "Pilih opsi [0-4]: " choice
+    read -p "Pilih opsi [0-5]: " choice
     case $choice in
       1) 
         install_dependencies
@@ -189,12 +235,16 @@ function main_menu() {
         register_validator
         read -p "Tekan Enter untuk kembali ke menu..."
         ;;
+      5) 
+        check_screen
+        read -p "Tekan Enter untuk kembali ke menu..."
+        ;;
       0) 
         echo "Keluar dari skrip. Terima kasih!"
         exit 0
         ;;
       *) 
-        echo "Pilihan tidak valid. Silakan pilih 0-4."
+        echo "Pilihan tidak valid. Silakan pilih 0-5."
         sleep 2
         ;;
     esac
