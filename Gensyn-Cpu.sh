@@ -18,18 +18,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Check if screen session 'gensyn' already exists
-if screen -list | grep -q "gensyn"; then
-    echo -e "${BOLD}${CYAN}============================================================${NC}"
-    echo -e "${BOLD}${RED}[✗] A screen session named 'gensyn' already exists.${NC}"
-    echo -e "${BOLD}${YELLOW}Please terminate the existing session or use a different name.${NC}"
-    echo -e "${BOLD}${YELLOW}To view sessions: ${GREEN}screen -list${NC}"
-    echo -e "${BOLD}${YELLOW}To reattach: ${GREEN}screen -r gensyn${NC}"
-    echo -e "${BOLD}${YELLOW}To terminate: ${GREEN}screen -S gensyn -X quit${NC}"
-    echo -e "${BOLD}${CYAN}============================================================${NC}"
-    exit 1
-fi
-
 # Install dependencies if not already installed
 echo -e "${BOLD}${CYAN}============================================================${NC}"
 echo -e "${BOLD}${GREEN}[✓] Checking and installing dependencies...${NC}"
@@ -72,29 +60,7 @@ fi
 
 echo -e "${BOLD}${CYAN}============================================================${NC}"
 
-# Start a new screen session named 'gensyn' and run the remaining script
-echo -e "${BOLD}${GREEN}[✓] Starting script in screen session 'gensyn'...${NC}"
-echo -e "${BOLD}${YELLOW}To reattach later, use: ${GREEN}screen -r gensyn${NC}"
-echo -e "${BOLD}${CYAN}============================================================${NC}"
-
-# Save the remaining script to a temporary file to execute in screen
-TEMP_SCRIPT=$(mktemp)
-cat << 'EOF' > "$TEMP_SCRIPT"
-#!/bin/bash
-
-# Re-define colors inside the screen session
-BOLD="\e[1m"
-CYAN="\e[36m"
-PURPLE="\e[35m"
-GREEN="\e[92m"
-RED="\e[91m"
-YELLOW="\e[93m"
-NC="\e[0m"
-
-SWARM_DIR="$HOME/rl-swarm"
-TEMP_DATA_PATH="$SWARM_DIR/modal-login/temp-data"
-HOME_DIR="$HOME"
-
+# Proceed with the original script
 cd $HOME
 
 if [ -f "$SWARM_DIR/swarm.pem" ]; then
@@ -143,18 +109,3 @@ cd rl-swarm || { echo -e "${BOLD}${RED}[✗] Failed to enter rl-swarm directory.
 echo -e "${BOLD}${CYAN}============================================================${NC}"
 echo -e "${BOLD}${GREEN}[✓] Running rl-swarm...${NC}"
 ./run_rl_swarm.sh
-EOF
-
-# Make the temporary script executable
-chmod +x "$TEMP_SCRIPT"
-
-# Start the screen session and run the temporary script
-screen -S gensyn -d -m bash "$TEMP_SCRIPT"
-
-# Inform the user
-echo -e "${BOLD}${GREEN}[✓] Screen session 'gensyn' started in detached mode.${NC}"
-echo -e "${BOLD}${YELLOW}You can reattach to it with: ${GREEN}screen -r gensyn${NC}"
-echo -e "${BOLD}${CYAN}============================================================${NC}"
-
-# Clean up the temporary script
-rm -f "$TEMP_SCRIPT"
