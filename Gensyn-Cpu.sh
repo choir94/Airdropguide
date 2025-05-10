@@ -1,6 +1,88 @@
 #!/bin/bash
 
-# Define colors for a more vibrant and modern look
+# Define colors for a vibrant and modern look
+BOLD="\e[1m"
+CYAN="\e[36m"
+PURPLE="\e[35m"
+GREEN="\e[92m"
+RED="\e[91m"
+YELLOW="\e[93m"
+NC="\e[0m"
+
+SWARM_DIR="$HOME/rl-swarm"
+TEMP_DATA_PATH="$SWARM_DIR/modal-login/temp-data"
+HOME_DIR="$HOME"
+
+# Function to check if a command is installed
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check if screen session 'gensyn' already exists
+if screen -list | grep -q "gensyn"; then
+    echo -e "${BOLD}${CYAN}============================================================${NC}"
+    echo -e "${BOLD}${RED}[✗] A screen session named 'gensyn' already exists.${NC}"
+    echo -e "${BOLD}${YELLOW}Please terminate the existing session or use a different name.${NC}"
+    echo -e "${BOLD}${YELLOW}To view sessions: ${GREEN}screen -list${NC}"
+    echo -e "${BOLD}${YELLOW}To reattach: ${GREEN}screen -r gensyn${NC}"
+    echo -e "${BOLD}${YELLOW}To terminate: ${GREEN}screen -S gensyn -X quit${NC}"
+    echo -e "${BOLD}${CYAN}============================================================${NC}"
+    exit 1
+fi
+
+# Install dependencies if not already installed
+echo -e "${BOLD}${CYAN}============================================================${NC}"
+echo -e "${BOLD}${GREEN}[✓] Checking and installing dependencies...${NC}"
+
+# Update package lists
+apt update >/dev/null 2>&1 || { echo -e "${BOLD}${RED}[✗] Failed to update package lists. Exiting.${NC}"; exit 1; }
+
+# Install sudo if not present
+if ! command_exists sudo; then
+    echo -e "${BOLD}${YELLOW}[✓] Installing sudo...${NC}"
+    apt install -y sudo >/dev/null 2>&1 || { echo -e "${BOLD}${RED}[✗] Failed to install sudo. Exiting.${NC}"; exit 1; }
+else
+    echo -e "${BOLD}${GREEN}[✓] sudo is already installed.${NC}"
+fi
+
+# Update package lists with sudo
+sudo apt update >/dev/null 2>&1 || { echo -e "${BOLD}${RED}[✗] Failed to update package lists with sudo. Exiting.${NC}"; exit 1; }
+
+# List of apt packages to install
+APT_PACKAGES="python3 python3-venv python3-pip curl wget screen git lsof nano unzip"
+
+# Check and install each apt package
+for pkg in $APT_PACKAGES; do
+    if ! command_exists "$pkg"; then
+        echo -e "${BOLD}${YELLOW}[✓] Installing $pkg...${NC}"
+        sudo apt install -y "$pkg" >/dev/null 2>&1 || { echo -e "${BOLD}${RED}[✗] Failed to install $pkg. Exiting.${NC}"; exit 1; }
+    else
+        echo -e "${BOLD}${GREEN}[✓] $pkg is already installed.${NC}"
+    fi
+done
+
+# Install Node.js if not present
+if ! command_exists node; then
+    echo -e "${BOLD}${YELLOW}[✓] Setting up Node.js...${NC}"
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/dev/null 2>&1
+    sudo apt-get install -y nodejs >/dev/null 2>&1 || { echo -e "${BOLD}${RED}[✗] Failed to install Node.js. Exiting.${NC}"; exit 1; }
+else
+    echo -e "${BOLD}${GREEN}[✓] Node.js is already installed.${NC}"
+fi
+
+echo -e "${BOLD}${CYAN}============================================================${NC}"
+
+# Start a new screen session named 'gensyn' and run the remaining script
+echo -e "${BOLD}${GREEN}[✓] Starting script in screen session 'gensyn'...${NC}"
+echo -e "${BOLD}${YELLOW}To reattach later, use: ${GREEN}screen -r gensyn${NC}"
+echo -e "${BOLD}${CYAN}============================================================${NC}"
+
+# Save the remaining script to a temporary file to execute in screen
+TEMP_SCRIPT=$(mktemp)
+cat << 'EOF' > "$TEMP_SCRIPT"
+#!/bin/bash
+
+# Re-define colors inside the screen session
 BOLD="\e[1m"
 CYAN="\e[36m"
 PURPLE="\e[35m"
@@ -34,7 +116,7 @@ if [ -f "$SWARM_DIR/swarm.pem" ]; then
             rm -rf "$SWARM_DIR"
 
             echo -e "${BOLD}${GREEN}[✓] Cloning fresh repository...${NC}"
-            cd $HOME && git clone https://github.com/choir94/rl-swarm.git > /dev/null 2>&1
+            cd $HOME && git clone https://github.com/choir94/rl-swarm.git >/dev/null 2>&1
 
             mv "$HOME_DIR/swarm.pem" rl-swarm/
             mv "$HOME_DIR/userData.json" rl-swarm/modal-login/temp-data/ 2>/dev/null
@@ -44,7 +126,7 @@ if [ -f "$SWARM_DIR/swarm.pem" ]; then
             echo -e "${BOLD}${GREEN}[✓] Removing existing folder and starting fresh...${NC}"
             rm -rf "$SWARM_DIR"
             sleep 2
-            cd $HOME && git clone https://github.com/choir94/rl-swarm.git > /dev/null 2>&1
+            cd $HOME && git clone https://github.com/choir94/rl-swarm.git >/dev/null 2>&1
             break
         else
             echo -e "\n${BOLD}${RED}[✗] Invalid choice. Please enter 1 or 2.${NC}"
@@ -53,7 +135,7 @@ if [ -f "$SWARM_DIR/swarm.pem" ]; then
 else
     echo -e "${BOLD}${CYAN}============================================================${NC}"
     echo -e "${BOLD}${GREEN}[✓] No existing swarm.pem found. Cloning repository...${NC}"
-    cd $HOME && [ -d rl-swarm ] && rm -rf rl-swarm; git clone https://github.com/choir94/rl-swarm.git > /dev/null 2>&1
+    cd $HOME && [ -d rl-swarm ] && rm -rf rl-swarm; git clone https://github.com/choir94/rl-swarm.git >/dev/null 2>&1
 fi
 
 cd rl-swarm || { echo -e "${BOLD}${RED}[✗] Failed to enter rl-swarm directory. Exiting.${NC}"; exit 1; }
@@ -61,3 +143,18 @@ cd rl-swarm || { echo -e "${BOLD}${RED}[✗] Failed to enter rl-swarm directory.
 echo -e "${BOLD}${CYAN}============================================================${NC}"
 echo -e "${BOLD}${GREEN}[✓] Running rl-swarm...${NC}"
 ./run_rl_swarm.sh
+EOF
+
+# Make the temporary script executable
+chmod +x "$TEMP_SCRIPT"
+
+# Start the screen session and run the temporary script
+screen -S gensyn -d -m bash "$TEMP_SCRIPT"
+
+# Inform the user
+echo -e "${BOLD}${GREEN}[✓] Screen session 'gensyn' started in detached mode.${NC}"
+echo -e "${BOLD}${YELLOW}You can reattach to it with: ${GREEN}screen -r gensyn${NC}"
+echo -e "${BOLD}${CYAN}============================================================${NC}"
+
+# Clean up the temporary script
+rm -f "$TEMP_SCRIPT"
