@@ -94,34 +94,58 @@ fi
 
 # Add current user (likely root if running this script directly) to the docker group
 log_info "Adding current user to the 'docker' group..."
-usermod -aG docker $USER
+usermod -aG docker "$USER"
 log_warn "After the installation is complete, you may need to LOGOUT and LOGIN AGAIN"
 log_warn "for the 'docker' group changes to take effect, allowing you to run 'docker' without sudo."
 
-# --- Section 2: Node.js & npm Installation (if not already present) ---
-log_info "Checking Node.js installation..."
-if command -v node &> /dev/null; then
-    log_success "Node.js is already installed: $(node -v)"
+---
+## Section 2: Node.js & npm Installation using NVM
+
+log_info "Checking NVM (Node Version Manager) installation..."
+if command -v nvm &> /dev/null; then
+    log_success "NVM is already installed."
 else
-    log_info "Node.js not found. Installing Node.js..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs >/dev/null 2>&1
-    if command -v node &> /dev/null; then
-        log_success "Node.js $(node -v) and npm $(npm -v) successfully installed."
+    log_info "NVM not found. Installing NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+    # Source NVM to make it available in the current session
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+    if command -v nvm &> /dev/null; then
+        log_success "NVM successfully installed."
     else
-        log_error "Failed to install Node.js. Please check your internet connection or error logs."
+        log_error "Failed to install NVM. Please check your internet connection or error logs."
     fi
 fi
 
-# --- Section 3: Synqchronize Installation ---
+log_info "Installing Node.js version 20.x using NVM..."
+# Ensure NVM is sourced in case it was just installed
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+nvm install 20
+nvm use 20
+nvm alias default 20 # Set Node.js 20 as the default version
+
+if command -v node &> /dev/null; then
+    log_success "Node.js $(node -v) and npm $(npm -v) successfully installed using NVM."
+else
+    log_error "Failed to install Node.js using NVM. Please check logs."
+fi
+
+---
+## Section 3: Synqchronize Installation
+
 log_info "Installing Synqchronize global package..."
+# Ensure npm uses the correct node version
 npm install -g synqchronizer >/dev/null 2>&1
 if command -v synqchronize &> /dev/null; then
     log_success "Synqchronize successfully installed globally."
 else
     log_warn "Synqchronize is installed, but 'synqchronize' might not be immediately recognized as a command."
     log_warn "This is common if you're using NVM or a non-standard Node.js installation."
-    # Ensure PATH is set, especially if NVM is used
+    # Ensure PATH is set for NVM global bins
     NPM_GLOBAL_BIN_PATH="$(npm config get prefix)/bin"
     if [[ ":$PATH:" != *":$NPM_GLOBAL_BIN_PATH:"* ]]; then
         log_info "Adding NPM global bin path to PATH..."
@@ -131,11 +155,18 @@ else
     fi
 fi
 
-# --- Section 4: Interactive Synqchronize Configuration ---
+---
+## Section 4: Interactive Synqchronize Configuration
+
 log_info "Starting Synqchronize configuration. Please enter your details when prompted."
+# Ensure synqchronize command is available after NVM setup
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 synqchronize init
 
-# --- Section 5: Setting up Systemd Service ---
+---
+## Section 5: Setting up Systemd Service
+
 log_info "Setting up Synqchronize as a Systemd service..."
 synqchronize service
 
