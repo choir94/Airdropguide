@@ -1,108 +1,101 @@
 #!/bin/bash
 
-# Skrip instalasi logo
+# Tampilkan logo (opsional)
 curl -s https://raw.githubusercontent.com/choir94/Airdropguide/refs/heads/main/logo.sh | bash
-sleep 5
+sleep 2
 
-# Fungsi untuk memeriksa apakah skrip dijalankan sebagai root
+# Cek root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        echo "Skrip ini harus dijalankan sebagai root. Keluar..."
+        echo "ERROR: Skrip ini harus dijalankan sebagai root!"
         exit 1
     fi
 }
 
-# Fungsi untuk memeriksa dan menginstal Docker
-install_docker() {
-    echo "Menginstal Docker..."
-    apt-get update -y && apt-get upgrade -y || { echo "Gagal memperbarui paket. Keluar..."; exit 1; }
+# Install Docker & Compose Plugin
+check_and_install_docker() {
+    if ! command -v docker &> /dev/null; then
+        echo "INFO: Docker belum ditemukan. Menginstal..."
 
-    # Hapus paket yang konflik
-    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
-        apt-get remove -y $pkg || echo "Gagal menghapus $pkg, mungkin tidak terinstal."
-    done
+        apt update -y && apt upgrade -y
 
-    # Instal dependensi yang diperlukan
-    apt-get install -y apt-transport-https ca-certificates curl software-properties-common gnupg lsb-release || { echo "Gagal menginstal dependensi. Keluar..."; exit 1; }
+        # Hapus versi lama
+        for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+            apt-get remove -y $pkg || true
+        done
 
-    # Tambahkan kunci GPG resmi Docker
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg || { echo "Gagal menambahkan kunci GPG Docker. Keluar..."; exit 1; }
-    chmod a+r /etc/apt/keyrings/docker.gpg
+        # Dependensi dasar
+        apt-get install -y ca-certificates curl gnupg
 
-    # Siapkan repositori stabil Docker
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null || { echo "Gagal menambahkan repositori Docker. Keluar..."; exit 1; }
+        # Tambah GPG dan repositori Docker resmi
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
 
-    # Instal Docker
-    apt-get update -y && apt-get install -y docker-ce docker-ce-cli containerd.io || { echo "Gagal menginstal Docker. Keluar..."; exit 1; }
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+        https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    # Mulai dan aktifkan layanan Docker
-    systemctl start docker || { echo "Gagal memulai layanan Docker. Keluar..."; exit 1; }
-    systemctl enable docker || { echo "Gagal mengaktifkan layanan Docker. Keluar..."; exit 1; }
+        apt update -y && apt upgrade -y
 
-    echo "Docker berhasil diinstal."
-}
+        # Install Docker dan Plugin Compose
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Fungsi untuk memeriksa dan menginstal Docker Compose Plugin
-install_docker_compose() {
-    if ! command -v docker compose &> /dev/null; then
-        echo "Menginstal Docker Compose Plugin..."
-        apt-get update -y
-        apt-get install -y docker-compose-plugin || { echo "Gagal menginstal Docker Compose Plugin. Keluar..."; exit 1; }
-        echo "Docker Compose Plugin berhasil diinstal."
+        # Aktifkan layanan
+        systemctl enable docker
+        systemctl start docker
+
+        echo "SUCCESS: Docker terinstal: $(docker --version)"
     else
-        echo "Docker Compose Plugin sudah terinstal."
+        echo "SUCCESS: Docker tersedia: $(docker --version)"
     fi
 }
 
-# Periksa apakah skrip dijalankan sebagai root
-check_root
+# Cek Docker Compose Plugin
+check_and_install_compose() {
+    if ! docker compose version &> /dev/null; then
+        echo "INFO: Docker Compose Plugin tidak ditemukan. Menginstal..."
+        apt-get install -y docker-compose-plugin
+        echo "SUCCESS: Docker Compose Plugin berhasil diinstal."
+    else
+        echo "SUCCESS: Docker Compose tersedia: $(docker compose version | head -n 1)"
+    fi
+}
 
-# Periksa dan instal Docker
-if ! command -v docker &> /dev/null; then
-    install_docker
-else
-    echo "Docker sudah terinstal."
+# Jalankan pengecekan & instalasi
+check_root
+check_and_install_docker
+check_and_install_compose
+
+# Cek layanan aktif
+if ! systemctl is-active --quiet docker; then
+    echo "ERROR: Docker tidak aktif. Menyalakan..."
+    systemctl restart docker || { echo "Gagal menjalankan Docker. Keluar..."; exit 1; }
 fi
 
-# Periksa dan instal Docker Compose Plugin
-install_docker_compose
-
-# Verifikasi Docker dan Docker Compose
-docker --version || { echo "Docker tidak berfungsi dengan benar. Keluar..."; exit 1; }
-docker compose version || { echo "Docker Compose tidak berfungsi dengan benar. Keluar..."; exit 1; }
-
-# Dapatkan zona waktu server
+# Zona waktu otomatis
 TIMEZONE=$(timedatectl | grep "Time zone" | awk '{print $3}')
 if [ -z "$TIMEZONE" ]; then
     read -p "Masukkan zona waktu Anda (default: Asia/Jakarta): " user_timezone
     TIMEZONE=${user_timezone:-Asia/Jakarta}
 fi
-echo "Zona waktu server terdeteksi: $TIMEZONE"
+echo "INFO: Zona waktu server: $TIMEZONE"
 
-# Minta input nama pengguna dan kata sandi dari pengguna
-read -p "Masukkan nama pengguna untuk Chromium: " CUSTOM_USER
-if [ -z "$CUSTOM_USER" ]; then
-    echo "Nama pengguna tidak boleh kosong. Keluar..."
-    exit 1
-fi
-read -p "Masukkan kata sandi untuk Chromium: " PASSWORD
-if [ -z "$PASSWORD" ]; then
-    echo "Kata sandi tidak boleh kosong. Keluar..."
-    exit 1
-fi
-echo "Nama pengguna yang dipilih: $CUSTOM_USER"
-echo "Kata sandi yang dipilih: $PASSWORD"
+# Input akun
+read -p "INPUT: Masukkan nama pengguna untuk Chromium: " CUSTOM_USER
+if [ -z "$CUSTOM_USER" ]; then echo "ERROR: Nama pengguna tidak boleh kosong."; exit 1; fi
 
-# Siapkan Chromium dengan Docker Compose
-echo "Menyiapkan Chromium dengan Docker Compose..."
+read -p "INPUT: Masukkan kata sandi untuk Chromium: " PASSWORD
+if [ -z "$PASSWORD" ]; then echo "ERROR: Kata sandi tidak boleh kosong."; exit 1; fi
+
+# Buat folder dan file docker-compose
 mkdir -p $HOME/chromium && cd $HOME/chromium
 
 cat <<EOF > docker-compose.yaml
----
 services:
   chromium:
-    image: lscr.io/linuxserver/chromium:latest
+    image: lscr.io/linuxserver/chromium:amd64-kasm
     container_name: chromium
     security_opt:
       - seccomp:unconfined
@@ -113,7 +106,6 @@ services:
       - PGID=1000
       - TZ=$TIMEZONE
       - LANG=en_US.UTF-8
-      - CHROME_CLI=https://google.com/
     volumes:
       - /root/chromium/config:/config
     ports:
@@ -123,27 +115,21 @@ services:
     restart: unless-stopped
 EOF
 
-# Verifikasi bahwa docker-compose.yaml telah dibuat dengan sukses
-if [ ! -f "docker-compose.yaml" ]; then
-    echo "Gagal membuat docker-compose.yaml. Keluar..."
-    exit 1
-fi
+# Jalankan container
+echo "INFO: Menjalankan Chromium container..."
+docker compose up -d || { echo "ERROR: Gagal menjalankan container."; exit 1; }
 
-# Jalankan kontainer Chromium
-echo "Menjalankan kontainer Chromium..."
-docker compose up -d || { echo "Gagal menjalankan kontainer Docker. Keluar..."; exit 1; }
-
-# Dapatkan alamat IP VPS
+# Info akses
 IPVPS=$(curl -s ifconfig.me)
+echo ""
+echo "SUCCESS: Chromium siap digunakan!"
+echo "URL: http://$IPVPS:3010 atau https://$IPVPS:3011"
+echo "Username: $CUSTOM_USER"
+echo "Password: $PASSWORD"
+echo "WARNING: Simpan informasi ini baik-baik."
 
-# Output informasi akses
-echo "Akses Chromium di browser Anda di: http://$IPVPS:3010/ atau https://$IPVPS:3011/"
-echo "Nama pengguna: $CUSTOM_USER"
-echo "Kata sandi: $PASSWORD"
-echo "Harap simpan data Anda, atau Anda akan kehilangan akses!"
-
-# Bersihkan sumber daya Docker yang tidak terpakai
-docker system prune -f
-echo "Sistem Docker dibersihkan."
-echo -e "\n🎉 **Rampung! ** 🎉"
-echo -e "\n👉 **[Gabung Airdrop Node](https://t.me/airdrop_node)** 👈"
+# Cleanup
+docker system prune -f > /dev/null
+echo "INFO: Sistem Docker dibersihkan."
+echo -e "\nSUCCESS: Instalasi selesai!"
+echo -e "COMMUNITY: Gabung komunitas: https://t.me/airdrop_node"
